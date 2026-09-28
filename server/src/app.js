@@ -2,14 +2,16 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const authRoutes = require('./routes/auth.routes');
+
 const app = express();
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+app.use('/api/auth', authRoutes);
+
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -17,12 +19,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root endpoint
 app.get('/', (req, res) => {
   res.send('PassPulse API Server');
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
