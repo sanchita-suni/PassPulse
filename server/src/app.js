@@ -1,3 +1,4 @@
+const qrRoutes = require('./routes/qr.routes');
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -8,6 +9,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+//QR routes
+app.use('/api/qr', qrRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
