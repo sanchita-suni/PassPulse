@@ -1,3 +1,4 @@
+import GateScanner from './pages/GateScanner'
 import { useState } from 'react'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
@@ -6,6 +7,27 @@ import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  const [showScanner, setShowScanner] = useState(false)
+
+  if (showScanner) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setShowScanner(false)}
+          style={{
+            margin: '20px',
+            padding: '10px 16px',
+            cursor: 'pointer',
+          }}
+        >
+          ← Back to Vite Home
+        </button>
+
+        <GateScanner />
+      </>
+    )
+  }
 
   return (
     <>
@@ -115,6 +137,17 @@ function App() {
 
       <div className="ticks"></div>
       <section id="spacer"></section>
+      <button
+    type="button"
+    onClick={() => setShowScanner(true)}
+    style={{
+      marginTop: '20px',
+      padding: '12px 20px',
+      cursor: 'pointer',
+    }}
+  >
+    Open Gate Scanner
+  </button>
     </>
   )
 }
