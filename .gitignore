@@ -16,6 +16,9 @@ node_modules/
 /.next/
 /out/
 
+# Test coverage reports
+coverage/
+
 # Logs & debugging
 npm-debug.log*
 yarn-debug.log*
