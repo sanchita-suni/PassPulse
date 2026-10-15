@@ -51,7 +51,7 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Execute Server Tests with Coverage
+      - name: Execute Server Tests with Coverage Gate (NFR-006, 80% minimum)
         working-directory: server
         env:
           PORT: 5001
@@ -61,7 +61,7 @@ jobs:
           JWT_SECRET: test_ci_jwt_super_secret_key_123
           JWT_EXPIRES_IN: 1d
           QR_HMAC_SECRET: test_ci_qr_hmac_secret_key_456
-        run: npm test -- --ci
+        run: npm run test:coverage -- --ci
 
   client-build-lint:
     name: Frontend Lint & Build
