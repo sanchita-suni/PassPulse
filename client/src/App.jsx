@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import GateScanner from './pages/GateScanner'
 import AttendeePass from './pages/AttendeePass'
+import EventCatalog from './pages/EventCatalog'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
@@ -21,6 +22,9 @@ function App() {
       }
       if (viewParam === 'scanner') {
         return { view: 'scanner', ticketId: 'TKT-CONFIRMED-001' }
+      }
+      if (viewParam === 'events') {
+        return { view: 'events', ticketId: 'TKT-CONFIRMED-001' }
       }
     }
     return { view: 'home', ticketId: 'TKT-CONFIRMED-001' }
@@ -107,6 +111,23 @@ function App() {
 
         <button
           type="button"
+          onClick={() => navigateTo('events')}
+          style={{
+            padding: '6px 14px',
+            borderRadius: '6px',
+            border: '1px solid var(--border)',
+            background: currentView === 'events' ? 'var(--accent)' : 'transparent',
+            color: currentView === 'events' ? '#fff' : 'var(--text-h)',
+            cursor: 'pointer',
+            fontWeight: 500,
+            fontSize: '13px',
+          }}
+        >
+          Events
+        </button>
+
+        <button
+          type="button"
           onClick={() => navigateTo('pass', selectedTicketId)}
           style={{
             padding: '6px 14px',
@@ -141,6 +162,15 @@ function App() {
       </div>
     </nav>
   )
+
+  if (currentView === 'events') {
+    return (
+      <>
+        {renderNav()}
+        <EventCatalog onOpenEvent={() => navigateTo('events')} />
+      </>
+    )
+  }
 
   if (currentView === 'pass') {
     return (
