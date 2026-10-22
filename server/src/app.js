@@ -5,6 +5,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth.routes');
 const qrRoutes = require('./routes/qr.routes');
 const checkinRoutes = require('./routes/checkin.routes');
+const eventRoutes = require('./routes/event.routes');
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/checkin', checkinRoutes);
+app.use('/api/events', eventRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
