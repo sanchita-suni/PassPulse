@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import GateScanner from './pages/GateScanner'
 import AttendeePass from './pages/AttendeePass'
 import EventCatalog from './pages/EventCatalog'
+import EventDetails from './pages/EventDetails'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
@@ -26,6 +27,9 @@ function App() {
       if (viewParam === 'events') {
         return { view: 'events', ticketId: 'TKT-CONFIRMED-001' }
       }
+      if (viewParam === 'event' && params.get('eventId')) {
+        return { view: 'event', ticketId: 'TKT-CONFIRMED-001', eventId: params.get('eventId') }
+      }
     }
     return { view: 'home', ticketId: 'TKT-CONFIRMED-001' }
   }
@@ -33,6 +37,7 @@ function App() {
   const initialState = getInitialState()
   const [currentView, setCurrentView] = useState(initialState.view)
   const [selectedTicketId, setSelectedTicketId] = useState(initialState.ticketId)
+  const [selectedEventId, setSelectedEventId] = useState(initialState.eventId || null)
 
   // Listen for browser popstate
   useEffect(() => {
@@ -40,15 +45,27 @@ function App() {
       const state = getInitialState()
       setCurrentView(state.view)
       setSelectedTicketId(state.ticketId)
+      setSelectedEventId(state.eventId || null)
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
+  function openEvent(eventId) {
+    setSelectedEventId(eventId)
+    setCurrentView('event')
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', 'event')
+    url.searchParams.set('eventId', eventId)
+    url.searchParams.delete('ticketId')
+    window.history.pushState({}, '', url)
+  }
+
   function navigateTo(view, ticketId) {
     setCurrentView(view)
     if (ticketId) setSelectedTicketId(ticketId)
     const url = new URL(window.location.href)
+    url.searchParams.delete('eventId')
     if (view === 'home') {
       url.searchParams.delete('view')
       url.searchParams.delete('ticketId')
@@ -167,7 +184,16 @@ function App() {
     return (
       <>
         {renderNav()}
-        <EventCatalog onOpenEvent={() => navigateTo('events')} />
+        <EventCatalog onOpenEvent={openEvent} />
+      </>
+    )
+  }
+
+  if (currentView === 'event' && selectedEventId) {
+    return (
+      <>
+        {renderNav()}
+        <EventDetails eventId={selectedEventId} onBack={() => navigateTo('events')} />
       </>
     )
   }
