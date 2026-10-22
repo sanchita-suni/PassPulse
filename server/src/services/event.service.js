@@ -137,6 +137,136 @@ async function listCategories() {
   return [...new Set(all.filter((e) => PUBLIC_STATUSES.includes(e.status)).map((e) => e.category))].sort();
 }
 
+
+const EDITABLE_FIELDS = ['title', 'description', 'category', 'venue', 'eventDate', 'capacity'];
+const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED'];
+
+function newEventId() {
+  return `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+function actorId(user) {
+  return user.id || user.userId;
+}
+
+function isAdmin(user) {
+  return (user.role || '').toUpperCase() === 'ADMIN';
+}
+
+/**
+ * Validates event fields. With partial=true only the supplied fields are checked (edits).
+ */
+function validateEventInput(input, { partial = false } = {}) {
+  const errors = [];
+  const out = {};
+
+  for (const field of ['title', 'category', 'venue']) {
+    if (input[field] !== undefined || !partial) {
+      const value = typeof input[field] === 'string' ? input[field].trim() : '';
+      if (!value) errors.push(`${field} is required`);
+      else if (value.length > 200) errors.push(`${field} must be at most 200 characters`);
+      else out[field] = value;
+    }
+  }
+
+  if (input.description !== undefined) {
+    out.description = String(input.description).trim().slice(0, 2000);
+  } else if (!partial) {
+    out.description = '';
+  }
+
+  if (input.eventDate !== undefined || !partial) {
+    const d = new Date(input.eventDate);
+    if (!input.eventDate || Number.isNaN(d.getTime())) errors.push('eventDate must be a valid date');
+    else if (d.getTime() <= Date.now()) errors.push('eventDate must be in the future');
+    else out.eventDate = d.toISOString();
+  }
+
+  if (input.capacity !== undefined || !partial) {
+    const c = Number(input.capacity);
+    if (!Number.isInteger(c) || c <= 0) errors.push('capacity must be a whole number greater than 0');
+    else out.capacity = c;
+  }
+
+  if (errors.length) {
+    const err = new EventError(400, 'VALIDATION_ERROR', errors.join('; '));
+    err.details = errors;
+    throw err;
+  }
+  return out;
+}
+
+/**
+ * Loads an event the caller may manage: its organizer, or an admin.
+ */
+async function getManageableEvent(id, user) {
+  const event = await EventModel.findById(id);
+  if (!event) throw new EventError(404, 'EVENT_NOT_FOUND', 'Event not found');
+  if (!isAdmin(user) && event.organizerId !== actorId(user)) {
+    throw new EventError(403, 'NOT_EVENT_OWNER', 'You can only manage your own events');
+  }
+  return event;
+}
+
+/**
+ * FR-005: a new event is always saved as DRAFT and owned by the caller.
+ */
+async function createEvent(input, user) {
+  const fields = validateEventInput(input);
+  const now = new Date().toISOString();
+  return EventModel.insert({
+    id: newEventId(),
+    organizerId: actorId(user),
+    ...fields,
+    status: 'DRAFT',
+    isFlagged: false,
+    tiers: [],
+    notices: [],
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function listOrganizerEvents(user) {
+  const all = await EventModel.findAll();
+  return all
+    .filter((e) => isAdmin(user) || e.organizerId === actorId(user))
+    .sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate));
+}
+
+/**
+ * FR-005: edit title, description, category, venue, date/time or capacity.
+ */
+async function updateEvent(id, input, user) {
+  const event = await getManageableEvent(id, user);
+  if (CLOSED_STATUSES.includes(event.status)) {
+    throw new EventError(409, 'EVENT_CLOSED', `A ${event.status} event cannot be edited`);
+  }
+  const supplied = Object.fromEntries(Object.entries(input).filter(([k]) => EDITABLE_FIELDS.includes(k)));
+  if (Object.keys(supplied).length === 0) {
+    throw new EventError(400, 'VALIDATION_ERROR', `Provide at least one of: ${EDITABLE_FIELDS.join(', ')}`);
+  }
+  const changes = validateEventInput(supplied, { partial: true });
+
+  const tierQuota = event.tiers.reduce((sum, t) => sum + t.quota, 0);
+  if (changes.capacity !== undefined && changes.capacity < tierQuota) {
+    throw new EventError(400, 'VALIDATION_ERROR', `capacity cannot be below the total tier quota (${tierQuota})`);
+  }
+
+  return EventModel.save({ ...event, ...changes });
+}
+
+/**
+ * FR-005: organizer cancels an event that has not finished.
+ */
+async function cancelEvent(id, user) {
+  const event = await getManageableEvent(id, user);
+  if (CLOSED_STATUSES.includes(event.status)) {
+    throw new EventError(409, 'EVENT_CLOSED', `Event is already ${event.status}`);
+  }
+  return EventModel.save({ ...event, status: 'CANCELLED' });
+}
+
 module.exports = {
   EventError,
   PUBLIC_STATUSES,
@@ -144,4 +274,10 @@ module.exports = {
   searchEvents,
   getPublicEvent,
   listCategories,
+  validateEventInput,
+  getManageableEvent,
+  createEvent,
+  listOrganizerEvents,
+  updateEvent,
+  cancelEvent,
 };
