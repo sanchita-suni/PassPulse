@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import RoleLogin from '../components/RoleLogin'
+import TierManager from '../components/TierManager'
 import {
   fetchMyEvents,
   createEvent,
@@ -195,11 +196,21 @@ function OrganizerDashboard({ session, onSession }) {
                 >
                   Edit
                 </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setMode(mode?.type === 'tiers' && mode.id === ev.id ? null : { type: 'tiers', id: ev.id })}
+                >
+                  Tiers ({ev.tiers.length})
+                </button>
                 <button type="button" className="btn" disabled={closed(ev.status)} onClick={() => handleCancel(ev)}>
                   Cancel event
                 </button>
               </div>
             </div>
+            {mode?.type === 'tiers' && mode.id === ev.id && (
+              <TierManager event={ev} token={token} onChanged={load} />
+            )}
             {mode?.type === 'edit' && mode.id === ev.id && (
               <EventForm
                 initial={{
