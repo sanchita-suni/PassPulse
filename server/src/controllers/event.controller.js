@@ -48,4 +48,75 @@ async function getEvent(req, res) {
   }
 }
 
-module.exports = { listEvents, listCategories, getEvent, sendError };
+
+/**
+ * POST /api/events (FR-005)
+ */
+async function createEvent(req, res) {
+  try {
+    const event = await eventService.createEvent(req.body || {}, req.user);
+    return res.status(201).json({ status: 'success', event });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * GET /api/events/mine (FR-005)
+ */
+async function listMyEvents(req, res) {
+  try {
+    const events = await eventService.listOrganizerEvents(req.user);
+    return res.status(200).json({ status: 'success', total: events.length, events });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * GET /api/events/:id/manage (FR-005), any status, owner or admin only
+ */
+async function getManagedEvent(req, res) {
+  try {
+    const event = await eventService.getManageableEvent(req.params.id, req.user);
+    return res.status(200).json({ status: 'success', event });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * PUT /api/events/:id (FR-005)
+ */
+async function updateEvent(req, res) {
+  try {
+    const event = await eventService.updateEvent(req.params.id, req.body || {}, req.user);
+    return res.status(200).json({ status: 'success', event });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * POST /api/events/:id/cancel (FR-005)
+ */
+async function cancelEvent(req, res) {
+  try {
+    const event = await eventService.cancelEvent(req.params.id, req.user);
+    return res.status(200).json({ status: 'success', event });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+module.exports = {
+  listEvents,
+  listCategories,
+  getEvent,
+  createEvent,
+  listMyEvents,
+  getManagedEvent,
+  updateEvent,
+  cancelEvent,
+  sendError,
+};

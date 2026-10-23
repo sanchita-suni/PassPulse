@@ -50,3 +50,24 @@ export function fetchEvent(eventId) {
 }
 
 export { request };
+
+// FR-005: organizer event management
+export function fetchMyEvents(token) {
+  return request('/api/events/mine', { token })
+}
+
+export function fetchManagedEvent(eventId, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/manage`, { token })
+}
+
+export function createEvent(event, token) {
+  return request('/api/events', { method: 'POST', token, body: event })
+}
+
+export function updateEvent(eventId, changes, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}`, { method: 'PUT', token, body: changes })
+}
+
+export function cancelEvent(eventId, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/cancel`, { method: 'POST', token })
+}

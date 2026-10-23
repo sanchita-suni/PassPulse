@@ -3,6 +3,7 @@ import GateScanner from './pages/GateScanner'
 import AttendeePass from './pages/AttendeePass'
 import EventCatalog from './pages/EventCatalog'
 import EventDetails from './pages/EventDetails'
+import OrganizerDashboard from './pages/OrganizerDashboard'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
@@ -24,6 +25,9 @@ function App() {
       if (viewParam === 'scanner') {
         return { view: 'scanner', ticketId: 'TKT-CONFIRMED-001' }
       }
+      if (viewParam === 'organizer') {
+        return { view: 'organizer', ticketId: 'TKT-CONFIRMED-001' }
+      }
       if (viewParam === 'events') {
         return { view: 'events', ticketId: 'TKT-CONFIRMED-001' }
       }
@@ -38,6 +42,7 @@ function App() {
   const [currentView, setCurrentView] = useState(initialState.view)
   const [selectedTicketId, setSelectedTicketId] = useState(initialState.ticketId)
   const [selectedEventId, setSelectedEventId] = useState(initialState.eventId || null)
+  const [organizerSession, setOrganizerSession] = useState(null)
 
   // Listen for browser popstate
   useEffect(() => {
@@ -145,6 +150,23 @@ function App() {
 
         <button
           type="button"
+          onClick={() => navigateTo('organizer')}
+          style={{
+            padding: '6px 14px',
+            borderRadius: '6px',
+            border: '1px solid var(--border)',
+            background: currentView === 'organizer' ? 'var(--accent)' : 'transparent',
+            color: currentView === 'organizer' ? '#fff' : 'var(--text-h)',
+            cursor: 'pointer',
+            fontWeight: 500,
+            fontSize: '13px',
+          }}
+        >
+          Organizer
+        </button>
+
+        <button
+          type="button"
           onClick={() => navigateTo('pass', selectedTicketId)}
           style={{
             padding: '6px 14px',
@@ -179,6 +201,15 @@ function App() {
       </div>
     </nav>
   )
+
+  if (currentView === 'organizer') {
+    return (
+      <>
+        {renderNav()}
+        <OrganizerDashboard session={organizerSession} onSession={setOrganizerSession} />
+      </>
+    )
+  }
 
   if (currentView === 'events') {
     return (
