@@ -12,10 +12,12 @@ async function request(path, { method = 'GET', token, body } = {}) {
   });
 
   let data = {};
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
+  if (response.status !== 204) {
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
   }
 
   if (!response.ok) {
@@ -70,4 +72,24 @@ export function updateEvent(eventId, changes, token) {
 
 export function cancelEvent(eventId, token) {
   return request(`/api/events/${encodeURIComponent(eventId)}/cancel`, { method: 'POST', token })
+}
+
+// FR-007: ticket tiers
+export function addTier(eventId, tier, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/tiers`, { method: 'POST', token, body: tier })
+}
+
+export function updateTier(eventId, tierId, changes, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/tiers/${encodeURIComponent(tierId)}`, {
+    method: 'PUT',
+    token,
+    body: changes,
+  })
+}
+
+export function removeTier(eventId, tierId, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/tiers/${encodeURIComponent(tierId)}`, {
+    method: 'DELETE',
+    token,
+  })
 }
