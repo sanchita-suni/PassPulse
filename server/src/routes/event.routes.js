@@ -18,6 +18,9 @@ router.get('/:id/manage', ...organizerOnly, controller.getManagedEvent);
 router.put('/:id', ...organizerOnly, controller.updateEvent);
 router.post('/:id/cancel', ...organizerOnly, controller.cancelEvent);
 
+// Lifecycle (FR-006)
+router.patch('/:id/status', ...organizerOnly, controller.changeStatus);
+
 // Ticket tiers (FR-007)
 router.get('/:id/tiers', ...organizerOnly, tierController.listTiers);
 router.post('/:id/tiers', ...organizerOnly, tierController.addTier);
