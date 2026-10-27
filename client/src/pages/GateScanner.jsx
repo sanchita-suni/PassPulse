@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { verifyCheckIn } from '../services/checkinApi'
 
-function GateScanner() {
+function GateScanner({ initialEventId = '' } = {}) {
   const scannerRef = useRef(null)
   const processingRef = useRef(false)
 
-  const [eventId, setEventId] = useState('')
+  const [eventId, setEventId] = useState(initialEventId)
   const [isScanning, setIsScanning] = useState(false)
   const [scannerError, setScannerError] = useState('')
   const [result, setResult] = useState(null)
