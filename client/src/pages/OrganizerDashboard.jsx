@@ -6,9 +6,22 @@ import {
   createEvent,
   updateEvent,
   cancelEvent,
+  changeEventStatus,
 } from '../services/eventsApi'
 import { formatDate } from '../utils/format'
 import './EventCatalog.css'
+
+// FR-006: the next steps an organizer can take (publishing is done by an admin)
+const ORGANIZER_ACTIONS = {
+  DRAFT: [['PENDING_APPROVAL', 'Submit for approval']],
+  PENDING_APPROVAL: [['DRAFT', 'Withdraw to draft']],
+  PUBLISHED: [['LIVE', 'Go live']],
+  LIVE: [['COMPLETED', 'Mark completed']],
+}
+
+function soldCount(ev) {
+  return ev.tiers.reduce((sum, t) => sum + t.sold, 0)
+}
 
 const BLANK = { title: '', description: '', category: '', venue: '', eventDate: '', capacity: '' }
 
@@ -132,8 +145,17 @@ function OrganizerDashboard({ session, onSession }) {
     await load()
   }
 
-  async function handleEdit(id, data) {
-    const res = await updateEvent(id, data, token)
+  async function handleEdit(ev, data) {
+    const sold = soldCount(ev)
+    const dateChanged = new Date(data.eventDate).getTime() !== new Date(ev.eventDate).getTime()
+    const changes = { ...data }
+    if (!dateChanged) delete changes.eventDate
+    if (dateChanged && sold > 0) {
+      // BR-006: holders must be told about a new date
+      if (!window.confirm(`${sold} tickets are sold. Change the date and notify every ticket holder?`)) return
+      changes.notifyHolders = true
+    }
+    const res = await updateEvent(ev.id, changes, token)
     setMode(null)
     setMessage(`Saved changes to "${res.event.title}".`)
     await load()
@@ -141,9 +163,25 @@ function OrganizerDashboard({ session, onSession }) {
 
   async function handleCancel(ev) {
     setError(null)
+    const sold = soldCount(ev)
+    const prompt = sold > 0
+      ? `${sold} tickets are sold. Cancel "${ev.title}" and notify every ticket holder?`
+      : `Cancel "${ev.title}"?`
+    if (!window.confirm(prompt)) return
     try {
-      await cancelEvent(ev.id, token)
+      await cancelEvent(ev.id, token, { notifyHolders: sold > 0 })
       setMessage(`Cancelled "${ev.title}".`)
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function handleStatus(ev, status, label) {
+    setError(null)
+    try {
+      await changeEventStatus(ev.id, status, token)
+      setMessage(`${label}: "${ev.title}" is now ${status}.`)
       await load()
     } catch (err) {
       setError(err.message)
@@ -184,10 +222,27 @@ function OrganizerDashboard({ session, onSession }) {
                 <span className="chip">{ev.status}</span>
                 <h3 style={{ margin: '6px 0', color: 'var(--text-h)' }}>{ev.title}</h3>
                 <div className="muted">
-                  {formatDate(ev.eventDate)} at {ev.venue}, capacity {ev.capacity}
+                  {formatDate(ev.eventDate)} at {ev.venue}, capacity {ev.capacity}, {soldCount(ev)} sold
                 </div>
+                {ev.status === 'PENDING_APPROVAL' && <div className="muted">Waiting for admin approval.</div>}
+                {ev.notices.length > 0 && (
+                  <div className="muted">
+                    Last notice sent to {ev.notices[ev.notices.length - 1].recipients} holders:{' '}
+                    {ev.notices[ev.notices.length - 1].message}
+                  </div>
+                )}
               </div>
-              <div className="catalog-actions">
+              <div className="catalog-actions" style={{ flexWrap: 'wrap' }}>
+                {(ORGANIZER_ACTIONS[ev.status] || []).map(([status, label]) => (
+                  <button
+                    key={status}
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => handleStatus(ev, status, label)}
+                  >
+                    {label}
+                  </button>
+                ))}
                 <button
                   type="button"
                   className="btn"
@@ -222,7 +277,7 @@ function OrganizerDashboard({ session, onSession }) {
                   capacity: ev.capacity,
                 }}
                 submitLabel="Save changes"
-                onSubmit={(data) => handleEdit(ev.id, data)}
+                onSubmit={(data) => handleEdit(ev, data)}
                 onCancel={() => setMode(null)}
               />
             )}
