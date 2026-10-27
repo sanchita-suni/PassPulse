@@ -60,8 +60,12 @@ function parseFilters(query = {}) {
   return filters;
 }
 
+function isPublic(event) {
+  return PUBLIC_STATUSES.includes(event.status) && !event.isFlagged;
+}
+
 function matches(event, f) {
-  if (!PUBLIC_STATUSES.includes(event.status)) return false;
+  if (!isPublic(event)) return false;
   if (f.category && event.category.toLowerCase() !== f.category) return false;
   if (f.venue && !event.venue.toLowerCase().includes(f.venue)) return false;
 
@@ -126,7 +130,7 @@ async function searchEvents(query) {
  */
 async function getPublicEvent(id) {
   const event = await EventModel.findById(id);
-  if (!event || !PUBLIC_STATUSES.includes(event.status)) {
+  if (!event || !isPublic(event)) {
     throw new EventError(404, 'EVENT_NOT_FOUND', 'Event not found');
   }
   return event;
@@ -134,7 +138,7 @@ async function getPublicEvent(id) {
 
 async function listCategories() {
   const all = await EventModel.findAll();
-  return [...new Set(all.filter((e) => PUBLIC_STATUSES.includes(e.status)).map((e) => e.category))].sort();
+  return [...new Set(all.filter(isPublic).map((e) => e.category))].sort();
 }
 
 

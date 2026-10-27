@@ -71,6 +71,7 @@ class UserModel {
       email: email.toLowerCase().trim(),
       passwordHash,
       role: role.toUpperCase(),
+      isActive: true,
       createdAt: new Date().toISOString(),
     };
     usersStore.push(newUser);
@@ -86,6 +87,24 @@ class UserModel {
   static async findById(id) {
     const user = usersStore.find((u) => u.id === id);
     return user ? { ...user } : null;
+  }
+
+  /**
+   * FR-019: admins deactivate or reactivate accounts. Returns the updated user or null.
+   */
+  static async setActive(id, isActive) {
+    const user = usersStore.find((u) => u.id === id);
+    if (!user) return null;
+    user.isActive = isActive;
+    return { ...user };
+  }
+
+  /**
+   * Synchronous check used by the auth middleware. Users without the flag are active.
+   */
+  static isDeactivated(id) {
+    const user = usersStore.find((u) => u.id === id);
+    return Boolean(user && user.isActive === false);
   }
 
   static seedDefaultUsers() {

@@ -115,6 +115,14 @@ const login = async (req, res) => {
       });
     }
 
+    if (user.isActive === false) {
+      return res.status(401).json({
+        status: 'error',
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'This account has been deactivated',
+      });
+    }
+
     const token = generateToken({
       id: user.id,
       userId: user.id,
