@@ -134,7 +134,10 @@ describe('PUT /api/events/:id (FR-005)', () => {
 
 describe('POST /api/events/:id/cancel (FR-005)', () => {
   test('owner cancels an event and it leaves the catalog', async () => {
-    const res = await request(app).post('/api/events/EVT-MUSIC-2026/cancel').set('Authorization', tokens.organizer());
+    const res = await request(app)
+      .post('/api/events/EVT-MUSIC-2026/cancel')
+      .set('Authorization', tokens.organizer())
+      .send({ notifyHolders: true });
     expect(res.status).toBe(200);
     expect(res.body.event.status).toBe('CANCELLED');
     const pub = await request(app).get('/api/events/EVT-MUSIC-2026');

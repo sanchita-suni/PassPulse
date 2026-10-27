@@ -253,18 +253,68 @@ async function updateEvent(id, input, user) {
     throw new EventError(400, 'VALIDATION_ERROR', `capacity cannot be below the total tier quota (${tierQuota})`);
   }
 
-  return EventModel.save({ ...event, ...changes });
+  const notices = [...event.notices];
+  if (changes.eventDate && changes.eventDate !== event.eventDate) {
+    const notice = requireHolderNotice(
+      event,
+      input.notifyHolders,
+      'DATE_CHANGED',
+      `${event.title} has moved to ${changes.eventDate}`
+    );
+    if (notice) notices.push(notice);
+  }
+
+  return EventModel.save({ ...event, ...changes, notices });
+}
+
+function ticketsSold(event) {
+  return event.tiers.reduce((sum, t) => sum + t.sold, 0);
+}
+
+/**
+ * BR-006: once tickets are sold, a date change or cancellation must notify
+ * every ticket holder. Returns the notice to record, or null if none is needed.
+ */
+function requireHolderNotice(event, notifyHolders, type, message) {
+  const sold = ticketsSold(event);
+  if (sold === 0) return null;
+  if (notifyHolders !== true) {
+    throw new EventError(
+      409,
+      'BOOKINGS_EXIST',
+      `${sold} ticket(s) are sold. Send notifyHolders: true to notify ticket holders of this change`
+    );
+  }
+  return { type, message, recipients: sold, sentAt: new Date().toISOString() };
+}
+
+/**
+ * FR-006: move an event to a new lifecycle state.
+ */
+async function changeStatus(id, to, user, { notifyHolders } = {}) {
+  // Required here because event_state.service imports EventError from this module.
+  const { assertTransition } = require('./event_state.service');
+  const event = await getManageableEvent(id, user);
+  const target = String(to || '').toUpperCase();
+  assertTransition(event, target, user.role);
+
+  const notices = [...event.notices];
+  if (target === 'CANCELLED') {
+    const notice = requireHolderNotice(event, notifyHolders, 'CANCELLED', `${event.title} has been cancelled`);
+    if (notice) notices.push(notice);
+  }
+  return EventModel.save({ ...event, status: target, notices });
 }
 
 /**
  * FR-005: organizer cancels an event that has not finished.
  */
-async function cancelEvent(id, user) {
+async function cancelEvent(id, user, options = {}) {
   const event = await getManageableEvent(id, user);
   if (CLOSED_STATUSES.includes(event.status)) {
     throw new EventError(409, 'EVENT_CLOSED', `Event is already ${event.status}`);
   }
-  return EventModel.save({ ...event, status: 'CANCELLED' });
+  return changeStatus(id, 'CANCELLED', user, options);
 }
 
 module.exports = {
@@ -280,4 +330,6 @@ module.exports = {
   listOrganizerEvents,
   updateEvent,
   cancelEvent,
+  changeStatus,
+  ticketsSold,
 };

@@ -70,8 +70,21 @@ export function updateEvent(eventId, changes, token) {
   return request(`/api/events/${encodeURIComponent(eventId)}`, { method: 'PUT', token, body: changes })
 }
 
-export function cancelEvent(eventId, token) {
-  return request(`/api/events/${encodeURIComponent(eventId)}/cancel`, { method: 'POST', token })
+export function cancelEvent(eventId, token, { notifyHolders = false } = {}) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/cancel`, {
+    method: 'POST',
+    token,
+    body: { notifyHolders },
+  })
+}
+
+// FR-006: lifecycle transitions
+export function changeEventStatus(eventId, status, token) {
+  return request(`/api/events/${encodeURIComponent(eventId)}/status`, {
+    method: 'PATCH',
+    token,
+    body: { status },
+  })
 }
 
 // FR-007: ticket tiers

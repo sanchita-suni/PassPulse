@@ -102,7 +102,22 @@ async function updateEvent(req, res) {
  */
 async function cancelEvent(req, res) {
   try {
-    const event = await eventService.cancelEvent(req.params.id, req.user);
+    const event = await eventService.cancelEvent(req.params.id, req.user, {
+      notifyHolders: req.body && req.body.notifyHolders,
+    });
+    return res.status(200).json({ status: 'success', event });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * PATCH /api/events/:id/status (FR-006)
+ */
+async function changeStatus(req, res) {
+  try {
+    const { status, notifyHolders } = req.body || {};
+    const event = await eventService.changeStatus(req.params.id, status, req.user, { notifyHolders });
     return res.status(200).json({ status: 'success', event });
   } catch (err) {
     return sendError(res, err);
@@ -118,5 +133,6 @@ module.exports = {
   getManagedEvent,
   updateEvent,
   cancelEvent,
+  changeStatus,
   sendError,
 };
