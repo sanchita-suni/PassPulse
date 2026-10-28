@@ -64,23 +64,49 @@ function isPublic(event) {
   return PUBLIC_STATUSES.includes(event.status) && !event.isFlagged;
 }
 
-function matches(event, f) {
-  if (!isPublic(event)) return false;
-  if (f.category && event.category.toLowerCase() !== f.category) return false;
-  if (f.venue && !event.venue.toLowerCase().includes(f.venue)) return false;
+/**
+ * NFR-001: the catalog is served from an index of public events that is rebuilt
+ * only when the event store changes. Each entry keeps the lower-cased search
+ * text, timestamp and tier prices so a query is a single pass with no cloning,
+ * and entries are pre-sorted by date. A category map narrows the scan when the
+ * category filter is used.
+ */
+let searchIndex = { version: -1, entries: [], byCategory: new Map() };
 
-  const date = new Date(event.eventDate);
-  if (f.startDate && date < f.startDate) return false;
-  if (f.endDate && date > f.endDate) return false;
+async function getSearchIndex() {
+  const current = EventModel.getVersion();
+  if (searchIndex.version === current) return searchIndex;
 
-  if (f.search) {
-    const text = `${event.title} ${event.description} ${event.venue} ${event.category}`.toLowerCase();
-    if (!text.includes(f.search)) return false;
+  const all = await EventModel.findAll();
+  const entries = all
+    .filter(isPublic)
+    .map((event) => ({
+      summary: toSummary(event),
+      text: `${event.title} ${event.description} ${event.venue} ${event.category}`.toLowerCase(),
+      venue: event.venue.toLowerCase(),
+      category: event.category.toLowerCase(),
+      time: new Date(event.eventDate).getTime(),
+      prices: event.tiers.map((t) => t.price),
+    }))
+    .sort((a, b) => a.time - b.time);
+
+  const byCategory = new Map();
+  for (const entry of entries) {
+    if (!byCategory.has(entry.category)) byCategory.set(entry.category, []);
+    byCategory.get(entry.category).push(entry);
   }
+  searchIndex = { version: current, entries, byCategory };
+  return searchIndex;
+}
 
+function matches(entry, f) {
+  if (f.venue && !entry.venue.includes(f.venue)) return false;
+  if (f.startDate && entry.time < f.startDate.getTime()) return false;
+  if (f.endDate && entry.time > f.endDate.getTime()) return false;
+  if (f.search && !entry.text.includes(f.search)) return false;
   if (f.minPrice !== null || f.maxPrice !== null) {
-    const inRange = event.tiers.some(
-      (t) => (f.minPrice === null || t.price >= f.minPrice) && (f.maxPrice === null || t.price <= f.maxPrice)
+    const inRange = entry.prices.some(
+      (p) => (f.minPrice === null || p >= f.minPrice) && (f.maxPrice === null || p <= f.maxPrice)
     );
     if (!inRange) return false;
   }
@@ -109,20 +135,53 @@ function toSummary(event) {
  * FR-004: returns PUBLISHED or LIVE events matching every supplied filter,
  * soonest first, paginated.
  */
+// Recent results keyed by normalised filters; cleared whenever the index is rebuilt.
+const RESULT_CACHE_SIZE = 500;
+const resultCache = new Map();
+let resultCacheVersion = -1;
+
+function cacheKey(f) {
+  return JSON.stringify([
+    f.search,
+    f.category,
+    f.venue,
+    f.startDate && f.startDate.getTime(),
+    f.endDate && f.endDate.getTime(),
+    f.minPrice,
+    f.maxPrice,
+    f.page,
+    f.limit,
+  ]);
+}
+
 async function searchEvents(query) {
   const filters = parseFilters(query);
-  const all = await EventModel.findAll();
-  const matched = all
-    .filter((e) => matches(e, filters))
-    .sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate));
+  const index = await getSearchIndex();
 
-  const start = (filters.page - 1) * filters.limit;
-  return {
-    total: matched.length,
-    page: filters.page,
-    limit: filters.limit,
-    events: matched.slice(start, start + filters.limit).map(toSummary),
-  };
+  if (resultCacheVersion !== index.version) {
+    resultCache.clear();
+    resultCacheVersion = index.version;
+  }
+  const key = cacheKey(filters);
+  let result = resultCache.get(key);
+
+  if (!result) {
+    const pool = filters.category ? index.byCategory.get(filters.category) || [] : index.entries;
+    const matched = pool.filter((entry) => matches(entry, filters));
+    const start = (filters.page - 1) * filters.limit;
+    result = {
+      total: matched.length,
+      page: filters.page,
+      limit: filters.limit,
+      events: matched.slice(start, start + filters.limit).map((entry) => entry.summary),
+    };
+    if (resultCache.size >= RESULT_CACHE_SIZE) {
+      resultCache.delete(resultCache.keys().next().value);
+    }
+    resultCache.set(key, result);
+  }
+
+  return { ...result, events: result.events.map((e) => ({ ...e })) };
 }
 
 /**
@@ -137,8 +196,8 @@ async function getPublicEvent(id) {
 }
 
 async function listCategories() {
-  const all = await EventModel.findAll();
-  return [...new Set(all.filter(isPublic).map((e) => e.category))].sort();
+  const index = await getSearchIndex();
+  return [...new Set(index.entries.map((e) => e.summary.category))].sort();
 }
 
 

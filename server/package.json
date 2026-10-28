@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "db:init": "node scripts/db-init.js"
+    "db:init": "node scripts/db-init.js",
+    "bench:search": "node scripts/bench-search.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

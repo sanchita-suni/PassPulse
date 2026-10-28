@@ -13,7 +13,11 @@ function sendError(res, err) {
  */
 async function listEvents(req, res) {
   try {
+    const started = process.hrtime.bigint();
     const result = await eventService.searchEvents(req.query);
+    // NFR-001: expose server-side search time for load-test evidence
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    res.set('Server-Timing', `search;dur=${ms.toFixed(2)}`);
     return res.status(200).json({
       status: 'success',
       message: result.total === 0 ? 'No events found' : undefined,
