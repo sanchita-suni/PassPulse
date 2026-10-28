@@ -7,6 +7,9 @@
  */
 const eventsStore = new Map();
 
+// Bumped on every write so readers can cache derived data (NFR-001 search index).
+let version = 0;
+
 function clone(event) {
   return {
     ...event,
@@ -124,6 +127,7 @@ class EventModel {
   }
 
   static async insert(event) {
+    version += 1;
     eventsStore.set(event.id, clone(event));
     return withAvailability(event);
   }
@@ -135,6 +139,7 @@ class EventModel {
       tiers: tiers.map(({ available, ...t }) => t),
       updatedAt: new Date().toISOString(),
     };
+    version += 1;
     eventsStore.set(event.id, clone(stored));
     return withAvailability(stored);
   }
@@ -144,11 +149,17 @@ class EventModel {
       for (const event of getDefaultSeedEvents()) {
         eventsStore.set(event.id, event);
       }
+      version += 1;
     }
   }
 
   static async clearAll() {
     eventsStore.clear();
+    version += 1;
+  }
+
+  static getVersion() {
+    return version;
   }
 }
 
