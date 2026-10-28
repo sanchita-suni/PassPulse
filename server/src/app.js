@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth.routes');
 const qrRoutes = require('./routes/qr.routes');
 const checkinRoutes = require('./routes/checkin.routes');
 const eventRoutes = require('./routes/event.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

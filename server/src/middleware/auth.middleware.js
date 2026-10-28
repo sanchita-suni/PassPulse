@@ -64,6 +64,15 @@ const authenticate = async (req, res, next) => {
       });
     }
 
+    // FR-019: a deactivated account is refused on its next request
+    if (user.isActive === false) {
+      return res.status(401).json({
+        status: 'error',
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'This account has been deactivated',
+      });
+    }
+
     const { passwordHash, ...sanitizedUser } = user;
     req.user = sanitizedUser;
     next();
@@ -89,6 +98,13 @@ function requireAuth(req, res, next) {
     const token = authHeader.split(' ')[1];
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
+      if (UserModel.isDeactivated(decoded.id || decoded.userId)) {
+        return res.status(401).json({
+          status: 'error',
+          code: 'ACCOUNT_DEACTIVATED',
+          message: 'This account has been deactivated',
+        });
+      }
       req.user = decoded;
       return next();
     } catch {
