@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { searchEvents, fetchCategories } from '../services/eventsApi'
 import { formatDate, formatPrice } from '../utils/format'
+import JourneySteps from '../components/JourneySteps'
 import './EventCatalog.css'
 
 const EMPTY_FILTERS = {
@@ -73,6 +74,7 @@ function EventCatalog({ onOpenEvent }) {
 
   return (
     <section className="catalog">
+      <JourneySteps current={1} />
       <h1>Discover events</h1>
       <p className="muted">Search events that are open for booking.</p>
 

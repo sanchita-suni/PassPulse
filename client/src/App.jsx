@@ -5,13 +5,11 @@ import EventCatalog from './pages/EventCatalog'
 import EventDetails from './pages/EventDetails'
 import OrganizerDashboard from './pages/OrganizerDashboard'
 import AdminPanel from './pages/AdminPanel'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import Checkout from './pages/Checkout'
+import BookingConfirmation from './pages/BookingConfirmation'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
   const [scannerEventId, setScannerEventId] = useState('EVT-TECH-2026')
 
   // Check URL parameters on mount (?view=pass&ticketId=...)
@@ -48,6 +46,9 @@ function App() {
   const [selectedEventId, setSelectedEventId] = useState(initialState.eventId || null)
   const [organizerSession, setOrganizerSession] = useState(null)
   const [adminSession, setAdminSession] = useState(null)
+  const [attendeeSession, setAttendeeSession] = useState(null)
+  const [selection, setSelection] = useState(null)
+  const [booking, setBooking] = useState(null)
 
   // Listen for browser popstate
   useEffect(() => {
@@ -133,24 +134,7 @@ function App() {
             fontSize: '13px',
           }}
         >
-          🏠 Home
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigateTo('events')}
-          style={{
-            padding: '6px 14px',
-            borderRadius: '6px',
-            border: '1px solid var(--border)',
-            background: currentView === 'events' ? 'var(--accent)' : 'transparent',
-            color: currentView === 'events' ? '#fff' : 'var(--text-h)',
-            cursor: 'pointer',
-            fontWeight: 500,
-            fontSize: '13px',
-          }}
-        >
-          Events
+          🏠 Events
         </button>
 
         <button
@@ -251,11 +235,51 @@ function App() {
     )
   }
 
+  // NFR-005: screens 3 and 4 of the booking journey
+  if (currentView === 'checkout' && selection) {
+    return (
+      <>
+        {renderNav()}
+        <Checkout
+          selection={selection}
+          session={attendeeSession}
+          onSession={setAttendeeSession}
+          onBack={() => setCurrentView('event')}
+          onConfirmed={(b) => {
+            setBooking(b)
+            setCurrentView('confirmation')
+          }}
+        />
+      </>
+    )
+  }
+
+  if (currentView === 'confirmation' && booking && selection) {
+    return (
+      <>
+        {renderNav()}
+        <BookingConfirmation
+          booking={booking}
+          selection={selection}
+          onViewPass={(ticketId) => navigateTo('pass', ticketId)}
+          onDone={() => navigateTo('home')}
+        />
+      </>
+    )
+  }
+
   if (currentView === 'event' && selectedEventId) {
     return (
       <>
         {renderNav()}
-        <EventDetails eventId={selectedEventId} onBack={() => navigateTo('events')} />
+        <EventDetails
+          eventId={selectedEventId}
+          onBack={() => navigateTo('home')}
+          onCheckout={(sel) => {
+            setSelection(sel)
+            setCurrentView('checkout')
+          }}
+        />
       </>
     )
   }
@@ -298,125 +322,11 @@ function App() {
     )
   }
 
+  // NFR-005: the home page is the catalog, screen 1 of the booking journey
   return (
     <>
       {renderNav()}
-
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>PassPulse</h1>
-          <p>
-            Smart Event Discovery, Multi-Tier Ticketing & Cryptographic QR Check-in Platform
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((c) => c + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation & Modules</h2>
-          <p>Sprint 5 Deliverables (QR Pass & Gate Scanner)</p>
-          <ul>
-            <li>
-              <a href="#pass" onClick={(e) => { e.preventDefault(); navigateTo('pass'); }}>
-                🎫 Attendee Digital Pass (FR-012)
-              </a>
-            </li>
-            <li>
-              <a href="#scanner" onClick={(e) => { e.preventDefault(); navigateTo('scanner'); }}>
-                📷 Gate Check-in Scanner (FR-013/14)
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the PassPulse Community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/sanchita-suni/PassPulse" target="_blank" rel="noreferrer">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://vite.dev/" target="_blank" rel="noreferrer">
-                <img className="logo" src={viteLogo} alt="" />
-                Vite Docs
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-
-      {/* Feature Navigation Action Buttons */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-          justifyContent: 'center',
-          flexWrap: 'wrap',
-          margin: '24px 16px',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => navigateTo('pass', 'TKT-CONFIRMED-001')}
-          style={{
-            padding: '12px 24px',
-            fontSize: '15px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            background: 'var(--accent)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-          }}
-        >
-          🎫 Open Attendee Digital Pass (FR-012)
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigateTo('scanner')}
-          style={{
-            padding: '12px 24px',
-            fontSize: '15px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            background: 'var(--code-bg)',
-            color: 'var(--text-h)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-          }}
-        >
-          📷 Open Gate Scanner
-        </button>
-      </div>
+      <EventCatalog onOpenEvent={openEvent} />
     </>
   )
 }
