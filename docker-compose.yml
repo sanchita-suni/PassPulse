@@ -1,4 +1,6 @@
-version: '3.8'
+# PassPulse stack (OPS-002): PostgreSQL, Redis, API and web client.
+# Setup: cp .env.example .env, then: docker compose up -d --build
+# Web client: http://localhost:8080   API: http://localhost:5000/api/health
 
 services:
   postgres:
@@ -7,12 +9,19 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
       POSTGRES_DB: passpulse_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # OPS-001 schema is applied automatically on the first start
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d passpulse_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -22,6 +31,43 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build: ./server
+    container_name: passpulse_server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${APP_ENV:-development}
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password123}@postgres:5432/passpulse_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      QR_HMAC_SECRET: ${QR_HMAC_SECRET:?Set QR_HMAC_SECRET in .env}
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_API_BASE_URL: http://localhost:5000
+    container_name: passpulse_client
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
 
 volumes:
   postgres_data:
