@@ -81,13 +81,14 @@ PassPulse/
 git clone https://github.com/sanchita-suni/PassPulse.git
 cd PassPulse
 
-# 2. Start PostgreSQL and Redis
-docker-compose up -d
+# 2. Start PostgreSQL and Redis only
+docker compose up -d postgres redis
 
 # 3. Backend
 cd server
 cp .env.example .env        # fill in DB_URL, REDIS_URL, JWT_SECRET, QR_HMAC_SECRET
 npm install
+npm run db:init             # applies server/db/schema.sql
 npm run dev                 # http://localhost:5000
 
 # 4. Frontend (new terminal)
@@ -95,6 +96,22 @@ cd client
 npm install
 npm run dev                 # http://localhost:5173
 ```
+
+### Run the whole stack with Docker (OPS-002)
+
+```bash
+cp .env.example .env        # set JWT_SECRET and QR_HMAC_SECRET
+docker compose up -d --build
+```
+
+| Service | Address |
+|---|---|
+| Web client (nginx) | http://localhost:8080 |
+| API | http://localhost:5000/api/health |
+| PostgreSQL | localhost:5432 (schema applied on first start) |
+| Redis | localhost:6379 |
+
+`APP_ENV=development` in `.env` loads the demo users and events. Stop with `docker compose down`; add `-v` to also delete the database volume.
 
 ### Environment Variables (`server/.env`)
 
