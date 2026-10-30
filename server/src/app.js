@@ -1,9 +1,10 @@
-const qrRoutes = require('./routes/qr.routes');
-const checkinRoutes = require('./routes/checkin.routes');
-
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+
+const authRoutes = require('./routes/auth.routes');
+const qrRoutes = require('./routes/qr.routes');
+const checkinRoutes = require('./routes/checkin.routes');
 
 const app = express();
 
@@ -12,7 +13,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-//QR routes
+// API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/checkin', checkinRoutes);
 
