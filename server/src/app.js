@@ -10,6 +10,9 @@ const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
+// SEC-004: behind the HTTPS proxy, take the client IP and protocol from X-Forwarded-* headers
+app.set('trust proxy', 'loopback, uniquelocal');
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
