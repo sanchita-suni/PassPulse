@@ -3,7 +3,7 @@
  *
  * Mirrors the events and ticket_tiers tables in db/schema.sql. Like the user,
  * ticket and check-in stores on main, records are held in process memory until
- * the PostgreSQL repositories are switched on (see docs/DEVIATIONS.md, DEV-004).
+ * the PostgreSQL repositories are switched on (see docs/DEVIATIONS.md, DEV-006).
  */
 const eventsStore = new Map();
 
