@@ -39,6 +39,8 @@ function verifyCheckIn(req, res, next) {
         INVALID_QR_FORMAT: 400,
         MISSING_QR_FIELDS: 400,
         MISSING_CHECKIN_FIELDS: 400,
+        INVALID_TICKET_STATUS: 400,
+        UNCONFIRMED_BOOKING: 400,
       };
 
       return res.status(statusByReason[result.reason] || 400).json({

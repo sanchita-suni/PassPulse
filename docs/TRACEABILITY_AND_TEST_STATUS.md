@@ -36,7 +36,7 @@ This matrix establishes bidirectionality between the approved Software Requireme
 | **FR-011** | Dynamic QR pass generation with HMAC-SHA256 signature and PNG data URL. | QR / Sambhram | `STORY-QR-01` (S1) | `services/qr.service.js`<br>`controllers/qr.controller.js` | `TC-QR-01`<br>`TC-QR-04`<br>`TC-QR-05` | **Working / Verified** | Verified in `qr.service.test.js` & `qr.routes.test.js`. Generates 64-hex HMAC signature. |
 | **FR-012** | Client pass presentation screen with attendee name, tier, and QR code. | QR / Sambhram | `STORY-INT-01` (S1) | `client/src/pages/AttendeePass.jsx`<br>`client/src/services/passApi.js` | `TC-UX-02` | **Working / Verified** | Verified in `attendeePass.routes.test.js` & React UI. Supported by PR #47. |
 | **FR-013** | Gate staff device camera pass scanning and signature/expiry verification. | Scanner / Sambhram | `STORY-SCN-01` (S1)<br>`STORY-SCN-02` (S2) | `services/checkin.service.js`<br>`client/src/pages/GateScanner.jsx` | `TC-QR-02`<br>`TC-QR-03`<br>`TC-SCN-03` | **Working / Verified** | Constant-time HMAC comparison verified in `checkin.service.test.js`. Scanner UI merged in PR #47. |
-| **FR-014** | Record first scan as `CHECKED_IN`; reject subsequent scans as `DUPLICATE_ENTRY`. | Scanner / Sambhram | `STORY-SCN-01` (S1) | `services/checkin.service.js`<br>`routes/checkin.routes.js` | `TC-SCN-01`<br>`TC-SCN-02` | **Working / Verified** | Verified in `checkin.routes.test.js`. Returns 200 on 1st scan, 409 on subsequent scans. |
+| **FR-014** | Record first scan as `CHECKED_IN`; reject subsequent scans as `DUPLICATE_ENTRY`. | Scanner / Sambhram | `STORY-SCN-01` (S1) | `services/checkin.service.js`<br>`routes/checkin.routes.js` | `TC-SCN-01`<br>`TC-SCN-02` | **Working / Verified** | Verified in `checkin.routes.test.js` & `checkin.service.test.js`. Enforces atomic check-and-set, ISO timestamp storage, duplicate rejection (409), and concurrency safety under simultaneous scans. |
 | **FR-015** | Attendee joins FIFO waitlist when ticket tier available seats reach zero. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js` | `TC-WTL-01` | **Not Implemented / Planned** | Scheduled for Sprint 2 using Redis list data structures (`RPUSH`). |
 | **FR-016** | Automatic email notification & 15-minute slot reservation for waitlist head on cancel. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js` | `TC-WTL-02`<br>`TC-WTL-03` | **Not Implemented / Planned** | Scheduled for Sprint 2. Background queue handler to be implemented. |
 | **FR-017** | Real-time check-in scan velocity and attendance percentage on organizer dashboard. | Telemetry / Sambhram | `STORY-TEL-01` (S2) | `routes/telemetry.routes.js`<br>`client/src/pages/Dashboard.jsx` | `TC-ANL-01` | **Not Implemented / Planned** | Scheduled for Sprint 2 via Server-Sent Events (SSE). |
@@ -49,7 +49,7 @@ This matrix establishes bidirectionality between the approved Software Requireme
 
 ```
 Test Suites: 7 passed, 7 total
-Tests:       47 passed, 47 total
+Tests:       59 passed, 59 total
 Snapshots:   0 total
 Status:      100% Pass Rate across all unit and integration suites
 ```
@@ -59,8 +59,8 @@ Status:      100% Pass Rate across all unit and integration suites
 | `tests/auth.test.js` | Authentication & RBAC | 10 | **PASSED** |
 | `src/routes/qr.routes.test.js` | QR Pass Generation API | 3 | **PASSED** |
 | `src/services/qr.service.test.js` | QR Cryptographic Signatures | 3 | **PASSED** |
-| `src/services/ticket.service.test.js` | Ticket Metadata & Formatting | 10 | **PASSED** |
-| `src/services/checkin.service.test.js` | Check-in Validation Logic | 4 | **PASSED** |
-| `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Auth | 13 | **PASSED** |
-| `src/routes/checkin.routes.test.js` | Gate Check-in API & Duplicate Check | 4 | **PASSED** |
-| **Total** | | **47** | **ALL GREEN** |
+| `src/services/ticket.service.test.js` | Ticket Metadata & Formatting | 12 | **PASSED** |
+| `src/services/checkin.service.test.js` | Check-in Validation Logic & Concurrency | 11 | **PASSED** |
+| `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Auth | 11 | **PASSED** |
+| `src/routes/checkin.routes.test.js` | Gate Check-in API & Duplicate Check | 9 | **PASSED** |
+| **Total** | | **59** | **ALL GREEN** |
