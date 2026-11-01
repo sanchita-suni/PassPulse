@@ -10,6 +10,7 @@ const { clearCheckInRecords } = require('../services/checkin.service');
 describe('Attendee Digital Pass API Integration (FR-012)', () => {
   let alexToken;
   let sarahToken;
+  let gateStaffToken;
 
   beforeEach(() => {
     initializeDefaultTickets();
@@ -27,6 +28,12 @@ describe('Attendee Digital Pass API Integration (FR-012)', () => {
       role: 'ATTENDEE',
       name: 'Sarah Connor',
       email: 'sarah.connor@example.com',
+    });
+
+    gateStaffToken = createToken({
+      userId: 'USR-STAFF-001',
+      role: 'GATE_STAFF',
+      name: 'Gate Scanner Staff',
     });
   });
 
@@ -126,6 +133,7 @@ describe('Attendee Digital Pass API Integration (FR-012)', () => {
     // 2. Gate staff scans QR at entrance
     const checkinResponse = await request(app)
       .post('/api/checkin/verify')
+      .set('Authorization', `Bearer ${gateStaffToken}`)
       .send({
         qrData,
         eventId,
@@ -140,6 +148,7 @@ describe('Attendee Digital Pass API Integration (FR-012)', () => {
     // 3. Duplicate scan rejected
     const duplicateResponse = await request(app)
       .post('/api/checkin/verify')
+      .set('Authorization', `Bearer ${gateStaffToken}`)
       .send({
         qrData,
         eventId,

@@ -79,7 +79,7 @@ const authenticate = async (req, res, next) => {
  * Middleware that strictly requires authentication.
  * Checks for:
  * 1. Bearer JWT token in Authorization header
- * 2. Or x-user-id header (convenient for API test suites / dev mode)
+ * 2. Or x-user-id header strictly restricted to automated test environments (NODE_ENV === 'test')
  */
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -100,7 +100,8 @@ function requireAuth(req, res, next) {
     }
   }
 
-  if (customUserId) {
+  // Allow x-user-id and x-user-role test shortcuts ONLY in automated test environments (NODE_ENV === 'test')
+  if (process.env.NODE_ENV === 'test' && customUserId) {
     req.user = {
       userId: customUserId,
       role: req.headers['x-user-role'] || 'ATTENDEE',
@@ -119,7 +120,7 @@ function requireAuth(req, res, next) {
 
 /**
  * Optional authentication middleware:
- * Attaches user to req.user if a token or x-user-id is present, but does not reject.
+ * Attaches user to req.user if a token is present (or x-user-id strictly in test mode), but does not reject.
  */
 function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -133,7 +134,7 @@ function optionalAuth(req, res, next) {
     } catch {
       // Ignored for optional auth
     }
-  } else if (customUserId) {
+  } else if (process.env.NODE_ENV === 'test' && customUserId) {
     req.user = {
       userId: customUserId,
       role: req.headers['x-user-role'] || 'ATTENDEE',

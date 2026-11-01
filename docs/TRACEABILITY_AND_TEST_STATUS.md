@@ -34,8 +34,8 @@ This matrix establishes bidirectionality between the approved Software Requireme
 | **FR-009** | Automatic return of held seats to stock upon hold expiration. | Booking / Reet | `STORY-BKG-02` (S1) | `services/hold.service.js` | `TC-BKG-02` | **Not Implemented / Planned** | Scheduled for Sprint 1. Requires Redis keyspace notification or TTL polling check. |
 | **FR-010** | Atomic booking confirmation in single PostgreSQL transaction (`FOR UPDATE`). | Booking / Reet | `STORY-BKG-03` (S2) | `controllers/booking.controller.js`<br>`services/booking.service.js` | `TC-BKG-03`<br>`TC-PERF-03` | **Not Implemented / Planned** | Core concurrency requirement to prevent overselling. Scheduled for Sprint 2. |
 | **FR-011** | Dynamic QR pass generation with HMAC-SHA256 signature and PNG data URL. | QR / Sambhram | `STORY-QR-01` (S1) | `services/qr.service.js`<br>`controllers/qr.controller.js` | `TC-QR-01`<br>`TC-QR-04`<br>`TC-QR-05` | **Working / Verified** | Verified in `qr.service.test.js` & `qr.routes.test.js`. Generates 64-hex HMAC signature. |
-| **FR-012** | Client pass presentation screen with attendee name, tier, and QR code. | QR / Sambhram | `STORY-INT-01` (S1) | `client/src/pages/AttendeePass.jsx`<br>`client/src/services/passApi.js` | `TC-UX-02` | **Working / Verified** | Verified in `attendeePass.routes.test.js` & React UI. Supported by PR #47. |
-| **FR-013** | Gate staff device camera pass scanning and signature/expiry verification. | Scanner / Sambhram | `STORY-SCN-01` (S1)<br>`STORY-SCN-02` (S2) | `services/checkin.service.js`<br>`client/src/pages/GateScanner.jsx` | `TC-QR-02`<br>`TC-QR-03`<br>`TC-SCN-03` | **Working / Verified** | Constant-time HMAC comparison verified in `checkin.service.test.js`. Scanner UI merged in PR #47. |
+| **FR-012** | Client pass presentation screen with attendee name, tier, and QR code. | QR / Sambhram | `STORY-INT-01` (S1) | `client/src/pages/AttendeePass.jsx`<br>`client/src/services/passApi.js` | `TC-UX-02` | **Working / Verified** | Verified in `attendeePass.routes.test.js` & React UI. Supported by PR #47. Authenticates via POST /api/auth/login. |
+| **FR-013** | Gate staff device camera pass scanning, signature/expiry verification, and RBAC authentication guard. | Scanner / Sambhram | `STORY-SCN-01` (S1)<br>`STORY-SCN-02` (S2) | `services/checkin.service.js`<br>`routes/checkin.routes.js`<br>`client/src/pages/GateScanner.jsx`<br>`client/src/components/StaffLogin.jsx` | `TC-QR-02`<br>`TC-QR-03`<br>`TC-SCN-03` | **Working / Verified** | Verified in `checkin.routes.test.js` (20 tests), `StaffLogin.jsx` & `GateScanner.jsx`. Enforces 401 unauthenticated and 403 attendee guards, restricting scans to GATE_STAFF, STAFF, and ADMIN with genuine JWTs. |
 | **FR-014** | Record first scan as `CHECKED_IN`; reject subsequent scans as `DUPLICATE_ENTRY`. | Scanner / Sambhram | `STORY-SCN-01` (S1) | `services/checkin.service.js`<br>`routes/checkin.routes.js` | `TC-SCN-01`<br>`TC-SCN-02` | **Working / Verified** | Verified in `checkin.routes.test.js` & `checkin.service.test.js`. Enforces atomic check-and-set, ISO timestamp storage, duplicate rejection (409), and concurrency safety under simultaneous scans. |
 | **FR-015** | Attendee joins FIFO waitlist when ticket tier available seats reach zero. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js` | `TC-WTL-01` | **Not Implemented / Planned** | Scheduled for Sprint 2 using Redis list data structures (`RPUSH`). |
 | **FR-016** | Automatic email notification & 15-minute slot reservation for waitlist head on cancel. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js` | `TC-WTL-02`<br>`TC-WTL-03` | **Not Implemented / Planned** | Scheduled for Sprint 2. Background queue handler to be implemented. |
@@ -49,18 +49,19 @@ This matrix establishes bidirectionality between the approved Software Requireme
 
 ```
 Test Suites: 7 passed, 7 total
-Tests:       59 passed, 59 total
+Tests:       87 passed, 87 total
 Snapshots:   0 total
+Time:        ~43 s
 Status:      100% Pass Rate across all unit and integration suites
 ```
 
 | Suite File | Module | Test Cases Passed | Status |
 | :--- | :--- | :---: | :---: |
-| `tests/auth.test.js` | Authentication & RBAC | 10 | **PASSED** |
-| `src/routes/qr.routes.test.js` | QR Pass Generation API | 3 | **PASSED** |
+| `tests/auth.test.js` | Authentication, Privilege Escalation Guard, Admin Provisioning & Seeding Isolation | 22 | **PASSED** |
+| `src/routes/qr.routes.test.js` | QR Pass Generation API & Token Security | 8 | **PASSED** |
 | `src/services/qr.service.test.js` | QR Cryptographic Signatures | 3 | **PASSED** |
 | `src/services/ticket.service.test.js` | Ticket Metadata & Formatting | 12 | **PASSED** |
 | `src/services/checkin.service.test.js` | Check-in Validation Logic & Concurrency | 11 | **PASSED** |
 | `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Auth | 11 | **PASSED** |
-| `src/routes/checkin.routes.test.js` | Gate Check-in API & Duplicate Check | 9 | **PASSED** |
-| **Total** | | **59** | **ALL GREEN** |
+| `src/routes/checkin.routes.test.js` | Gate Check-in API, Duplicate Check & Gate Staff RBAC | 20 | **PASSED** |
+| **Total** | | **87** | **ALL GREEN** |
