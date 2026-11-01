@@ -68,7 +68,7 @@ export async function fetchAttendeeTickets({ token, userId }) {
 }
 
 /**
- * Retrieve a signed JWT token for the specified user ID (for demo & testing).
+ * Retrieve a signed JWT token for the specified user ID (for demo & testing strictly for attendees).
  */
 export async function fetchDemoToken(userId = 'USR-ATTENDEE-001') {
   const response = await fetch(

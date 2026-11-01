@@ -1,14 +1,22 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-export async function verifyCheckIn({ qrData, eventId }) {
+export async function verifyCheckIn({ qrData, eventId, token, userId }) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else if (userId) {
+    headers['x-user-id'] = userId;
+  }
+
   const response = await fetch(
     `${API_BASE_URL}/api/checkin/verify`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         qrData,
         eventId,
@@ -18,20 +26,20 @@ export async function verifyCheckIn({ qrData, eventId }) {
         bookingConfirmationStatus: 'CONFIRMED',
       }),
     }
-  )
+  );
 
-  const body = await response.json()
+  const body = await response.json();
 
   if (!response.ok) {
     const error = new Error(
       body.message || 'Check-in failed'
-    )
+    );
 
-    error.code = body.code
-    error.status = response.status
+    error.code = body.code;
+    error.status = response.status;
 
-    throw error
+    throw error;
   }
 
-  return body
+  return body;
 }

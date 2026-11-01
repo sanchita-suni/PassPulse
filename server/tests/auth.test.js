@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../src/app');
 const UserModel = require('../src/models/user.model');
+const { hashPassword } = require('../src/utils/password.util');
 
 describe('User Authentication & RBAC API (FR-001, FR-002, FR-003, SEC-001, SEC-002)', () => {
   beforeEach(async () => {
@@ -53,14 +54,64 @@ describe('User Authentication & RBAC API (FR-001, FR-002, FR-003, SEC-001, SEC-0
       expect(res.statusCode).toBe(400);
       expect(res.body.status).toBe('error');
     });
+
+    it('TC-AUTH-SEC-01: should force ATTENDEE role even when role: "ADMIN" is requested in public registration (CWE-269)', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          fullName: 'Malicious Admin Wannabe',
+          email: 'wannabe.admin@pes.edu',
+          password: 'Password@123',
+          role: 'ADMIN',
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.status).toBe('success');
+      expect(res.body.data.user.role).toBe('ATTENDEE');
+      expect(res.body.data.user.email).toBe('wannabe.admin@pes.edu');
+    });
+
+    it('TC-AUTH-SEC-02: should force ATTENDEE role even when role: "GATE_STAFF" is requested in public registration', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          fullName: 'Malicious Staff Wannabe',
+          email: 'wannabe.staff@pes.edu',
+          password: 'Password@123',
+          role: 'GATE_STAFF',
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.status).toBe('success');
+      expect(res.body.data.user.role).toBe('ATTENDEE');
+    });
+
+    it('TC-AUTH-SEC-03: should prevent publicly registered user with attempted ADMIN role from accessing admin endpoint', async () => {
+      const regRes = await request(app)
+        .post('/api/auth/register')
+        .send({
+          fullName: 'Sneaky User',
+          email: 'sneaky@pes.edu',
+          password: 'Password@123',
+          role: 'ADMIN',
+        });
+
+      const token = regRes.body.data.token;
+      const accessRes = await request(app)
+        .get('/api/auth/admin-only')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(accessRes.statusCode).toBe(403);
+      expect(accessRes.body.message).toContain('Forbidden: Access denied');
+    });
   });
 
   describe('POST /api/auth/login', () => {
     beforeEach(async () => {
-      await request(app).post('/api/auth/register').send({
+      await UserModel.create({
         fullName: 'Saatvik Gupta',
         email: 'loginuser@pes.edu',
-        password: 'SecurePassword123',
+        passwordHash: await hashPassword('SecurePassword123'),
         role: 'ORGANIZER',
       });
     });
@@ -86,6 +137,37 @@ describe('User Authentication & RBAC API (FR-001, FR-002, FR-003, SEC-001, SEC-0
       expect(res.statusCode).toBe(401);
       expect(res.body.status).toBe('error');
     });
+
+    it('TC-AUTH-08: should login GATE_STAFF successfully with genuine JWT and role', async () => {
+      await UserModel.create({
+        fullName: 'Gate Staff Lead',
+        email: 'gatestaff@pes.edu',
+        passwordHash: await hashPassword('Password@123'),
+        role: 'GATE_STAFF',
+      });
+
+      const loginRes = await request(app).post('/api/auth/login').send({
+        email: 'gatestaff@pes.edu',
+        password: 'Password@123',
+      });
+
+      expect(loginRes.statusCode).toBe(200);
+      expect(loginRes.body.status).toBe('success');
+      expect(loginRes.body.data.token).toBeDefined();
+      expect(loginRes.body.data.user.role).toBe('GATE_STAFF');
+      expect(loginRes.body.data.user.email).toBe('gatestaff@pes.edu');
+    });
+
+    it('TC-AUTH-09: should reject login when user email does not exist (401 Unauthorized)', async () => {
+      const res = await request(app).post('/api/auth/login').send({
+        email: 'nonexistent@pes.edu',
+        password: 'SomePassword123',
+      });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.status).toBe('error');
+      expect(res.body.message).toContain('Invalid email or password credentials');
+    });
   });
 
   describe('JWT Verification & RBAC Middleware (/api/auth/me & /api/auth/admin-only)', () => {
@@ -101,11 +183,16 @@ describe('User Authentication & RBAC API (FR-001, FR-002, FR-003, SEC-001, SEC-0
       });
       attendeeToken = attRes.body.data.token;
 
-      const admRes = await request(app).post('/api/auth/register').send({
+      await UserModel.create({
         fullName: 'Admin User',
         email: 'admin@pes.edu',
-        password: 'Password@123',
+        passwordHash: await hashPassword('Password@123'),
         role: 'ADMIN',
+      });
+
+      const admRes = await request(app).post('/api/auth/login').send({
+        email: 'admin@pes.edu',
+        password: 'Password@123',
       });
       adminToken = admRes.body.data.token;
     });
@@ -150,6 +237,147 @@ describe('User Authentication & RBAC API (FR-001, FR-002, FR-003, SEC-001, SEC-0
 
       expect(res.statusCode).toBe(401);
       expect(res.body.message).toContain('Invalid or expired authentication token');
+    });
+  });
+
+  describe('POST /api/auth/provision (Admin-Only User Provisioning - SEC-002, CWE-269)', () => {
+    let adminToken;
+    let attendeeToken;
+
+    beforeEach(async () => {
+      await UserModel.create({
+        fullName: 'Provision Admin',
+        email: 'provadmin@pes.edu',
+        passwordHash: await hashPassword('AdminPass@123'),
+        role: 'ADMIN',
+      });
+
+      const admLogin = await request(app).post('/api/auth/login').send({
+        email: 'provadmin@pes.edu',
+        password: 'AdminPass@123',
+      });
+      adminToken = admLogin.body.data.token;
+
+      const attReg = await request(app).post('/api/auth/register').send({
+        fullName: 'Regular Attendee',
+        email: 'regattendee@pes.edu',
+        password: 'Password@123',
+      });
+      attendeeToken = attReg.body.data.token;
+    });
+
+    it('TC-PROV-01: should reject unauthenticated provisioning request with 401 Unauthorized', async () => {
+      const res = await request(app)
+        .post('/api/auth/provision')
+        .send({
+          fullName: 'New Gate Staff',
+          email: 'newgate@pes.edu',
+          password: 'Password@123',
+          role: 'GATE_STAFF',
+        });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.status).toBe('error');
+    });
+
+    it('TC-PROV-02: should reject non-admin (attendee) provisioning request with 403 Forbidden', async () => {
+      const res = await request(app)
+        .post('/api/auth/provision')
+        .set('Authorization', `Bearer ${attendeeToken}`)
+        .send({
+          fullName: 'New Gate Staff',
+          email: 'newgate@pes.edu',
+          password: 'Password@123',
+          role: 'GATE_STAFF',
+        });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.status).toBe('error');
+    });
+
+    it('TC-PROV-03: should allow authenticated ADMIN to provision a new GATE_STAFF account with 201 Created', async () => {
+      const res = await request(app)
+        .post('/api/auth/provision')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fullName: 'New Gate Staff',
+          email: 'newgate@pes.edu',
+          password: 'Password@123',
+          role: 'GATE_STAFF',
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.status).toBe('success');
+      expect(res.body.data.user.role).toBe('GATE_STAFF');
+      expect(res.body.data.user.email).toBe('newgate@pes.edu');
+
+      // Verify the provisioned user can log in with their credentials
+      const loginRes = await request(app).post('/api/auth/login').send({
+        email: 'newgate@pes.edu',
+        password: 'Password@123',
+      });
+      expect(loginRes.statusCode).toBe(200);
+      expect(loginRes.body.data.user.role).toBe('GATE_STAFF');
+    });
+
+    it('TC-PROV-04: should reject provisioning request with invalid role (400 Bad Request)', async () => {
+      const res = await request(app)
+        .post('/api/auth/provision')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fullName: 'Super User',
+          email: 'superuser@pes.edu',
+          password: 'Password@123',
+          role: 'SUPERUSER',
+        });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.status).toBe('error');
+      expect(res.body.message).toContain('Invalid role');
+    });
+
+    it('TC-PROV-05: should reject duplicate email in provisioning (409 Conflict)', async () => {
+      await request(app)
+        .post('/api/auth/provision')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fullName: 'Staff Lead',
+          email: 'lead@pes.edu',
+          password: 'Password@123',
+          role: 'STAFF',
+        });
+
+      const res = await request(app)
+        .post('/api/auth/provision')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fullName: 'Another Staff',
+          email: 'lead@pes.edu',
+          password: 'Password@456',
+          role: 'STAFF',
+        });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.body.status).toBe('error');
+    });
+  });
+
+  describe('Default Account Seeding Isolation (SEC-001, CWE-1188)', () => {
+    it('TC-SEED-01: should NOT automatically seed accounts in test environment', async () => {
+      await UserModel.clearAll();
+      expect(UserModel.getAllUsers().length).toBe(0);
+    });
+
+    it('TC-SEED-02: should seed default users when seedDefaultUsers is called in development mode', async () => {
+      await UserModel.clearAll();
+      expect(UserModel.getAllUsers().length).toBe(0);
+
+      UserModel.seedDefaultUsers();
+      const seeded = UserModel.getAllUsers();
+      expect(seeded.length).toBeGreaterThan(0);
+      const admin = seeded.find((u) => u.role === 'ADMIN');
+      expect(admin).toBeDefined();
+      expect(admin.email).toBe('admin@passpulse.io');
     });
   });
 });

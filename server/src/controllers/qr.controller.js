@@ -116,11 +116,30 @@ async function getAttendeeTicketsController(req, res, next) {
 
 /**
  * Generates a signed JWT token for demo/testing attendee authentication.
+ * Restricted strictly to automated test environments (NODE_ENV === 'test').
+ * Privileged roles (ADMIN, STAFF, GATE_STAFF) are strictly forbidden.
  */
 function getDemoTokenController(req, res, next) {
   try {
+    if (process.env.NODE_ENV !== 'test') {
+      return res.status(403).json({
+        status: 'error',
+        code: 'FORBIDDEN',
+        message: 'Demo token generation is disabled outside automated test environments',
+      });
+    }
+
+    const requestedRole = (req.query.role || 'ATTENDEE').toUpperCase();
+    if (requestedRole !== 'ATTENDEE') {
+      return res.status(403).json({
+        status: 'error',
+        code: 'FORBIDDEN',
+        message: 'Forbidden: Demo token endpoint cannot issue privileged tokens',
+      });
+    }
+
     const userId = req.query.userId || 'USR-ATTENDEE-001';
-    const role = req.query.role || 'ATTENDEE';
+    const role = 'ATTENDEE';
     const name =
       req.query.name ||
       (userId === 'USR-ATTENDEE-001'
