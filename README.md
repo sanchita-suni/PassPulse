@@ -81,13 +81,14 @@ PassPulse/
 git clone https://github.com/sanchita-suni/PassPulse.git
 cd PassPulse
 
-# 2. Start PostgreSQL and Redis
-docker-compose up -d
+# 2. Start PostgreSQL and Redis only
+docker compose up -d postgres redis
 
 # 3. Backend
 cd server
 cp .env.example .env        # fill in DB_URL, REDIS_URL, JWT_SECRET, QR_HMAC_SECRET
 npm install
+npm run db:init             # applies server/db/schema.sql
 npm run dev                 # http://localhost:5000
 
 # 4. Frontend (new terminal)
@@ -95,6 +96,26 @@ cd client
 npm install
 npm run dev                 # http://localhost:5173
 ```
+
+### Run the whole stack with Docker (OPS-002, SEC-004)
+
+```bash
+cp .env.example .env            # set JWT_SECRET and QR_HMAC_SECRET
+bash scripts/gen-dev-cert.sh    # self-signed certificate for https://localhost (Git Bash on Windows)
+docker compose up -d --build
+bash scripts/check-tls.sh       # TC-SEC-03: TLS 1.3 only, HTTP to HTTPS redirect, HSTS
+```
+
+| Service | Address |
+|---|---|
+| Web client | https://localhost |
+| API | https://localhost/api/health |
+| PostgreSQL | localhost:5432 (schema applied on first start) |
+| Redis | localhost:6379 |
+
+The API and client have no public ports; all traffic goes through the nginx proxy, which accepts TLS 1.3 only and redirects plain HTTP to HTTPS. The browser will warn about the self-signed certificate the first time.
+
+`APP_ENV=development` in `.env` loads the demo users and events. Stop with `docker compose down`; add `-v` to also delete the database volume.
 
 ### Environment Variables (`server/.env`)
 

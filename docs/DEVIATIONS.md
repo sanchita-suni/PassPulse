@@ -122,8 +122,63 @@ Each recorded deviation must include:
 
 ---
 
+### DEV-006: In-Memory Event and Tier Repository
+* **Deviation ID:** `DEV-006`
+* **Date Logged:** 30-Oct-2026
+* **Specification Reference:** SRS `FR-004` to `FR-007`, SAD Section 3.6 (`events`, `ticket_tiers` tables)
+* **Description of Deviation:**  
+  `server/src/models/event.model.js` keeps events and tiers in process memory, mirroring the columns of `server/db/schema.sql`, instead of reading and writing the PostgreSQL tables.
+* **Technical / Operational Reason:**  
+  Keeps the events module consistent with the user, ticket and check-in stores already on `main` (DEV-001, DEV-002), so the whole demo runs without a database and the modules can be switched to PostgreSQL together.
+* **Architectural & Quality Impact:**  
+  Events created during a session are lost on server restart. Business rules, validation and API contracts are unaffected because they sit in the service layer.
+* **Approval Status:** **Approved (Temporary)**
+* **Corrective Action & Target Sprint:**  
+  The schema, pool (`src/config/db.js`) and `npm run db:init` are ready (OPS-001). Replace the methods of `EventModel` with SQL against `events` and `ticket_tiers`; the service layer does not change.
+* **Final Demo Explanation:**  
+  Show `schema.sql` applied to PostgreSQL and the constraint tests, then run the catalog on the in-memory repository.
+
+---
+
+### DEV-007: NFR-001 Measured With User Think Time
+* **Deviation ID:** `DEV-007`
+* **Date Logged:** 30-Oct-2026
+* **Specification Reference:** SRS `NFR-001`, STP `TC-PERF-01`
+* **Description of Deviation:**  
+  The 150 ms p95 target is met with 500 virtual users who pause 1 s between searches (p95 16.2 ms), which is how the k6 script models users. With 500 clients sending back-to-back requests and no pause, p95 is 187.3 ms on a single API process on 2 cores.
+* **Technical / Operational Reason:**  
+  Search itself takes under 1 ms; the extra time under back-to-back load is queueing on one Node.js process. Details in `docs/perf/NFR-001_Search_Performance.md`.
+* **Architectural & Quality Impact:**  
+  None for realistic browsing load. Sustained load above about 3,000 requests per second per process would need more API processes.
+* **Approval Status:** **Proposed**
+* **Corrective Action & Target Sprint:**  
+  If the stricter reading is required, run the API in cluster mode or as more than one container behind the existing proxy.
+* **Final Demo Explanation:**  
+  Run `npm run bench:search` with and without `THINK_MS=1000` and show both results.
+
+---
+
+### DEV-008: Booking Journey Waits on the Booking Engine
+* **Deviation ID:** `DEV-008`
+* **Date Logged:** 30-Oct-2026
+* **Specification Reference:** SRS `NFR-005`, STP `TC-UX-01`, dependent on `FR-008` and `FR-010`
+* **Description of Deviation:**  
+  The 4-screen booking journey is built, but the hold and confirm steps call `/api/bookings/hold` and `/api/bookings/confirm`, which are not on `main` yet. The 5-user walkthrough has therefore not been run.
+* **Technical / Operational Reason:**  
+  The booking engine is a separate module (issues #20 and #22).
+* **Architectural & Quality Impact:**  
+  Attendees can browse and pick tickets but cannot complete a booking until the booking module is merged. The checkout screen explains this.
+* **Approval Status:** **Approved (Temporary)**
+* **Corrective Action & Target Sprint:**  
+  After the booking module merges, run the walkthrough in `docs/NFR-005_Booking_Journey.md` and record results.
+* **Final Demo Explanation:**  
+  Show screens 1 to 3 and the step indicator; show the endpoint contract the checkout uses.
+
+---
+
 ## 3. Deviation Review & Audit History
 
 | Revision | Date | Reviewed By | Changes Summary |
 | :---: | :---: | :---: | :--- |
 | **1.0** | 15-Oct-2026 | Sanchita Sunil (Team Lead), Saatvik Gupta (QA/Security) | Initial deviation baseline established across storage, email dispatch, and frontend tooling. |
+| **1.1** | 30-Oct-2026 | Sanchita Sunil (Team Lead) | Added DEV-006 (in-memory event repository), DEV-007 (NFR-001 load model) and DEV-008 (booking journey dependency). |
