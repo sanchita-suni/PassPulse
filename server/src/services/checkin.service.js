@@ -54,12 +54,16 @@ function validateCheckInData({
  * Validates a QR pass and records a check-in.
  * Guarantees that at most one successful check-in is recorded per ticket,
  * rejecting duplicate scans and concurrent scans with DUPLICATE_ENTRY.
+ *
+ * Enforces ticket existence in official ticket repository (FR-011 / FR-014).
+ * Derives effective statuses exclusively from official repository records.
+ * Never uses client-supplied status values as authoritative values.
  */
 function processCheckIn({
   qrData,
   eventId,
-  ticketStatus,
-  bookingConfirmationStatus,
+  ticketStatus: _clientTicketStatus,
+  bookingConfirmationStatus: _clientBookingConfirmationStatus,
 }) {
   const qrResult = verifyQrPass(qrData);
 
@@ -83,21 +87,19 @@ function processCheckIn({
     };
   }
 
-  // Cross-reference with central ticket repository if ticket is registered
-  let effectiveTicketStatus = ticketStatus;
-  let effectiveBookingStatus = bookingConfirmationStatus;
-
-  if (typeof getTicketById === 'function') {
-    const existingTicket = getTicketById(ticketId);
-    if (existingTicket) {
-      if (existingTicket.ticketStatus) {
-        effectiveTicketStatus = existingTicket.ticketStatus;
-      }
-      if (existingTicket.bookingConfirmationStatus) {
-        effectiveBookingStatus = existingTicket.bookingConfirmationStatus;
-      }
-    }
+  // Enforce ticket existence in central repository - reject unrecorded tickets
+  const existingTicket = typeof getTicketById === 'function' ? getTicketById(ticketId) : null;
+  if (!existingTicket) {
+    return {
+      success: false,
+      reason: 'TICKET_NOT_FOUND',
+    };
   }
+
+  // Derive effective statuses EXCLUSIVELY from official repository record
+  // Client-supplied status values are never used as authoritative values
+  const effectiveTicketStatus = existingTicket.ticketStatus;
+  const effectiveBookingStatus = existingTicket.bookingConfirmationStatus;
 
   const validation = validateCheckInData({
     ticketId,
@@ -139,12 +141,9 @@ function processCheckIn({
     checkInRecords.set(ticketId, checkIn);
 
     // Sync with central ticket model if present
-    if (typeof getTicketById === 'function') {
-      const existingTicket = getTicketById(ticketId);
-      if (existingTicket) {
-        existingTicket.isCheckedIn = true;
-        existingTicket.checkedInAt = checkIn.checkedInAt;
-      }
+    if (existingTicket) {
+      existingTicket.isCheckedIn = true;
+      existingTicket.checkedInAt = checkIn.checkedInAt;
     }
 
     return {

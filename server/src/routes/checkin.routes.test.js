@@ -10,6 +10,7 @@ const { generateQrPass } = require('../services/qr.service');
 const { createToken } = require('../middleware/auth.middleware');
 const UserModel = require('../models/user.model');
 const { hashPassword } = require('../utils/password.util');
+const { registerTicket, clearTickets } = require('../services/ticket.service');
 const {
   clearCheckInRecords,
   getCheckInCount,
@@ -32,6 +33,16 @@ describe('Check-in API (FR-013 & FR-014 / Issues #25 & #26)', () => {
 
   beforeEach(async () => {
     clearCheckInRecords();
+    clearTickets();
+
+    registerTicket({
+      ticketId: baseData.ticketId,
+      eventId: baseData.eventId,
+      userId: baseData.userId,
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'CONFIRMED',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
 
     gateStaffToken = createToken({
       userId: 'USR-STAFF-001',
@@ -188,6 +199,14 @@ describe('Check-in API (FR-013 & FR-014 / Issues #25 & #26)', () => {
     });
 
     test('5. Rejects a cancelled ticket status with HTTP 400 INVALID_TICKET_STATUS', async () => {
+      registerTicket({
+        ticketId: baseData.ticketId,
+        eventId: baseData.eventId,
+        userId: baseData.userId,
+        ticketStatus: 'CANCELLED',
+        bookingConfirmationStatus: 'CONFIRMED',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
       const response = await request(app)
         .post('/api/checkin/verify')
         .set('Authorization', `Bearer ${gateStaffToken}`)
@@ -204,6 +223,14 @@ describe('Check-in API (FR-013 & FR-014 / Issues #25 & #26)', () => {
     });
 
     test('6. Rejects an unconfirmed booking status with HTTP 400 UNCONFIRMED_BOOKING', async () => {
+      registerTicket({
+        ticketId: baseData.ticketId,
+        eventId: baseData.eventId,
+        userId: baseData.userId,
+        ticketStatus: 'VALID',
+        bookingConfirmationStatus: 'PENDING',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
       const response = await request(app)
         .post('/api/checkin/verify')
         .set('Authorization', `Bearer ${gateStaffToken}`)
@@ -446,6 +473,29 @@ describe('Check-in API (FR-013 & FR-014 / Issues #25 & #26)', () => {
       expect(checkinRes.body.code).toBe('CHECKED_IN');
       expect(checkinRes.body.data.ticketId).toBe(baseData.ticketId);
       expect(getCheckInCount()).toBe(1);
+    });
+
+    test('21. Rejects check-in with HTTP 404 when ticket ID does not exist in ticket repository, even with VALID and CONFIRMED client payloads', async () => {
+      const unknownPass = await generateQrPass({
+        ticketId: 'TKT-UNKNOWN-404',
+        eventId: baseData.eventId,
+        userId: baseData.userId,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
+
+      const response = await request(app)
+        .post('/api/checkin/verify')
+        .set('Authorization', `Bearer ${gateStaffToken}`)
+        .send({
+          qrData: unknownPass.qrData,
+          eventId: baseData.eventId,
+          ticketStatus: 'VALID',
+          bookingConfirmationStatus: 'CONFIRMED',
+        });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.body.status).toBe('error');
+      expect(response.body.code).toBe('TICKET_NOT_FOUND');
     });
   });
 });
