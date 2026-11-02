@@ -23,6 +23,15 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
     clearCheckInRecords();
     clearTickets();
 
+    registerTicket({
+      ticketId: baseData.ticketId,
+      eventId: baseData.eventId,
+      userId: baseData.userId,
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'CONFIRMED',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+
     const pass = await generateQrPass({
       ...baseData,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
@@ -166,10 +175,21 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
     expect(invalidValidation.valid).toBe(false);
     expect(invalidValidation.reason).toBe('INVALID_TICKET_STATUS');
 
+    // Register ticket with CANCELLED status in repository
+    registerTicket({
+      ticketId: baseData.ticketId,
+      eventId: baseData.eventId,
+      userId: baseData.userId,
+      ticketStatus: 'CANCELLED',
+      bookingConfirmationStatus: 'CONFIRMED',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+
+    // Scanner client claims VALID, but repository status is CANCELLED (authoritative)
     const result = processCheckIn({
       qrData,
       eventId: baseData.eventId,
-      ticketStatus: 'CANCELLED',
+      ticketStatus: 'VALID',
       bookingConfirmationStatus: 'CONFIRMED',
     });
 
@@ -190,11 +210,22 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
     expect(pendingValidation.valid).toBe(false);
     expect(pendingValidation.reason).toBe('UNCONFIRMED_BOOKING');
 
+    // Register ticket with PENDING status in repository
+    registerTicket({
+      ticketId: baseData.ticketId,
+      eventId: baseData.eventId,
+      userId: baseData.userId,
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'PENDING',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+
+    // Scanner client claims CONFIRMED, but repository status is PENDING (authoritative)
     const result = processCheckIn({
       qrData,
       eventId: baseData.eventId,
       ticketStatus: 'VALID',
-      bookingConfirmationStatus: 'PENDING',
+      bookingConfirmationStatus: 'CONFIRMED',
     });
 
     expect(result.success).toBe(false);
@@ -268,6 +299,15 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
       expiresAt: new Date(Date.now() + 3600000).toISOString(),
     });
 
+    registerTicket({
+      ticketId: 'TKT-EVENT2-001',
+      eventId: 'EVT-OTHER-002',
+      userId: 'USR-002',
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'CONFIRMED',
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
+
     processCheckIn({
       qrData: pass2.qrData,
       eventId: 'EVT-OTHER-002',
@@ -279,5 +319,25 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
     expect(getCheckInCount(baseData.eventId)).toBe(1);
     expect(getCheckInCount('EVT-OTHER-002')).toBe(1);
     expect(getCheckInRecords(baseData.eventId)).toHaveLength(1);
+  });
+
+  test('12. Rejects check-in when ticket ID does not exist in ticket repository, even if request claims VALID and CONFIRMED', async () => {
+    const unknownPass = await generateQrPass({
+      ticketId: 'TKT-UNREGISTERED-999',
+      eventId: baseData.eventId,
+      userId: baseData.userId,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+
+    const result = processCheckIn({
+      qrData: unknownPass.qrData,
+      eventId: baseData.eventId,
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'CONFIRMED',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe('TICKET_NOT_FOUND');
+    expect(getCheckInCount()).toBe(0);
   });
 });

@@ -6,11 +6,12 @@ const {
   getDemoTokenController,
 } = require('../controllers/qr.controller');
 const { requireAuth } = require('../middleware/auth.middleware');
+const { authorize } = require('../middleware/rbac.middleware');
 
 const router = express.Router();
 
-// Raw QR pass generation endpoint (FR-011)
-router.post('/pass', createQrPass);
+// Internal QR pass generation endpoint (FR-011) - restricted to staff/admin to prevent arbitrary public pass minting
+router.post('/pass', requireAuth, authorize(['STAFF', 'ADMIN']), createQrPass);
 
 // Attendee token generator for testing / demo auth
 router.get('/token', getDemoTokenController);

@@ -41,6 +41,7 @@ function verifyCheckIn(req, res, next) {
         MISSING_CHECKIN_FIELDS: 400,
         INVALID_TICKET_STATUS: 400,
         UNCONFIRMED_BOOKING: 400,
+        TICKET_NOT_FOUND: 404,
       };
 
       return res.status(statusByReason[result.reason] || 400).json({

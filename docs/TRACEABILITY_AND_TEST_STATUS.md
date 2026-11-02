@@ -49,19 +49,19 @@ This matrix establishes bidirectionality between the approved Software Requireme
 
 ```
 Test Suites: 7 passed, 7 total
-Tests:       87 passed, 87 total
+Tests:       97 passed, 97 total
 Snapshots:   0 total
-Time:        ~43 s
+Time:        ~92 s
 Status:      100% Pass Rate across all unit and integration suites
 ```
 
 | Suite File | Module | Test Cases Passed | Status |
 | :--- | :--- | :---: | :---: |
 | `tests/auth.test.js` | Authentication, Privilege Escalation Guard, Admin Provisioning & Seeding Isolation | 22 | **PASSED** |
-| `src/routes/qr.routes.test.js` | QR Pass Generation API & Token Security | 8 | **PASSED** |
+| `src/routes/qr.routes.test.js` | QR Pass Generation API, Access Guards, Integrity & Token Security | 16 | **PASSED** |
 | `src/services/qr.service.test.js` | QR Cryptographic Signatures | 3 | **PASSED** |
 | `src/services/ticket.service.test.js` | Ticket Metadata & Formatting | 12 | **PASSED** |
-| `src/services/checkin.service.test.js` | Check-in Validation Logic & Concurrency | 11 | **PASSED** |
+| `src/services/checkin.service.test.js` | Check-in Validation Logic, Ticket Existence & Concurrency | 12 | **PASSED** |
 | `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Auth | 11 | **PASSED** |
-| `src/routes/checkin.routes.test.js` | Gate Check-in API, Duplicate Check & Gate Staff RBAC | 20 | **PASSED** |
-| **Total** | | **87** | **ALL GREEN** |
+| `src/routes/checkin.routes.test.js` | Gate Check-in API, Ticket Existence, Duplicate Check & Gate Staff RBAC | 21 | **PASSED** |
+| **Total** | | **97** | **ALL GREEN** |
