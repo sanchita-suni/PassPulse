@@ -24,6 +24,10 @@ function setPool(customPool) {
   pool = customPool;
 }
 
+function isPoolInitialized() {
+  return pool !== null;
+}
+
 async function query(text, params) {
   return getPool().query(text, params);
 }
@@ -35,4 +39,4 @@ async function closePool() {
   pool = null;
 }
 
-module.exports = { getPool, setPool, query, closePool };
+module.exports = { getPool, setPool, isPoolInitialized, query, closePool };
