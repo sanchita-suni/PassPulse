@@ -380,4 +380,127 @@ describe('User Authentication & RBAC API (FR-001, FR-002, FR-003, SEC-001, SEC-0
       expect(admin.email).toBe('admin@passpulse.io');
     });
   });
+
+  describe('SEC-003: Input Validation, SQL Injection & XSS Mitigation', () => {
+    it('TC-SEC-04: should reject registration when email contains SQL injection payload', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        fullName: 'Attacker User',
+        email: "attacker' OR '1'='1'--@pes.edu",
+        password: 'Password@123',
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.status).toBe('error');
+      expect(res.body.message).toContain('Invalid email address format');
+    });
+
+    it('TC-SEC-05: should safely reject login attempt with SQL injection payload without leaking database errors or bypassing auth', async () => {
+      const res = await request(app).post('/api/auth/login').send({
+        email: "' OR 1=1 --",
+        password: "' OR '1'='1",
+      });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.status).toBe('error');
+      expect(res.body.message).toContain('Invalid email or password credentials');
+    });
+
+    it('TC-SEC-06: should safely handle script tags (XSS payloads) in registration data without executing or corrupting API output', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        fullName: '<script>alert("XSS")</script>',
+        email: 'xss.safe@pes.edu',
+        password: 'Password@123',
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.status).toBe('success');
+      expect(res.body.data.user.fullName).toBe('<script>alert("XSS")</script>');
+
+      const user = await UserModel.findByEmail('xss.safe@pes.edu');
+      expect(user.fullName).toBe('<script>alert("XSS")</script>');
+    });
+
+    it('TC-SEC-07: should resist SQL injection attempts targeting user lookup by ID', async () => {
+      const user = await UserModel.findById("1'; DROP TABLE users; --");
+      expect(user).toBeNull();
+    });
+  });
+
+  describe('Security Middleware Edge Cases & Branch Coverage (SEC-002)', () => {
+    const { optionalAuth, authenticate } = require('../src/middleware/auth.middleware');
+    const { authorize } = require('../src/middleware/rbac.middleware');
+    const { generateToken } = require('../src/utils/jwt.util');
+
+    it('TC-MID-01: authorize middleware should return 401 if invoked without prior authentication (req.user missing)', () => {
+      const middleware = authorize(['ADMIN']);
+      const req = { headers: {} };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+      const next = jest.fn();
+
+      middleware(req, res, next);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Authentication required before authorization check',
+        })
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('TC-MID-02: optionalAuth middleware should attach user when valid Bearer token provided', () => {
+      const token = generateToken({ id: 'USR-OPT-1', role: 'ATTENDEE', name: 'Opt User', email: 'opt@x.io' });
+      const req = { headers: { authorization: `Bearer ${token}` } };
+      const res = {};
+      const next = jest.fn();
+
+      optionalAuth(req, res, next);
+      expect(req.user).toBeDefined();
+      expect(req.user.id).toBe('USR-OPT-1');
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('TC-MID-03: optionalAuth middleware should silently proceed without user when no token is provided', () => {
+      const req = { headers: {} };
+      const res = {};
+      const next = jest.fn();
+
+      optionalAuth(req, res, next);
+      expect(req.user).toBeUndefined();
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('TC-MID-04: optionalAuth middleware should silently ignore invalid token and proceed without user', () => {
+      const req = { headers: { authorization: 'Bearer invalid.jwt.token' } };
+      const res = {};
+      const next = jest.fn();
+
+      optionalAuth(req, res, next);
+      expect(req.user).toBeUndefined();
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('TC-MID-05: authenticate middleware should return 401 when token has valid signature but user is deleted from database', async () => {
+      const deletedUserToken = generateToken({ id: 'USR-DELETED-999' });
+      const req = {
+        headers: { authorization: `Bearer ${deletedUserToken}` },
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+      const next = jest.fn();
+
+      await authenticate(req, res, next);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'User associated with this token no longer exists',
+        })
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
 });

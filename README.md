@@ -161,5 +161,15 @@ Six 2-week Agile Scrum sprints:
 
 - [`docs/PassPulse_Project_Synopsis.pdf`](docs/PassPulse_Project_Synopsis.pdf) — Phase 1 synopsis
 - [`docs/PassPulse_Deliverable2_Requirements_SRS.pdf`](docs/PassPulse_Deliverable2_Requirements_SRS.pdf) — SRS v2.0, validation specification, and SPMP
+- [`docs/PassPulse_SRS_SAD_STP.pdf`](docs/PassPulse_SRS_SAD_STP.pdf) — Complete SRS, SAD, and STP specification
+- [`docs/TRACEABILITY_AND_TEST_STATUS.md`](docs/TRACEABILITY_AND_TEST_STATUS.md) — Master Requirements Traceability & Verification Matrix
+- [`docs/TEST_CASES_UPDATED.md`](docs/TEST_CASES_UPDATED.md) — Mini-Project Part-3 Updated Test Cases Document
+- [`docs/UNIT_TEST_REPORT.md`](docs/UNIT_TEST_REPORT.md) — Mini-Project Part-3 Unit Test Report (195/195 tests passed)
+- [`docs/SYSTEM_VALIDATION_REPORT.md`](docs/SYSTEM_VALIDATION_REPORT.md) — Mini-Project Part-3 System Validation Report
+- [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) — Mini-Project Part-3 Code Coverage Report (95.71% Stmts, 88.79% Branches)
+- [`docs/BRANCH_COVERAGE_REPORT.md`](docs/BRANCH_COVERAGE_REPORT.md) — Mini-Project Part-3 Branch Coverage Report
+- [`docs/SPRINT_PLAN.md`](docs/SPRINT_PLAN.md) — Agile Sprint Plan & Work Allocations
+- [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) — Git workflow, branch protections, and CI/CD policies
+- [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) — Architectural and requirement deviations register
 
 
