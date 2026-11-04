@@ -7,6 +7,7 @@ import OrganizerDashboard from './pages/OrganizerDashboard'
 import AdminPanel from './pages/AdminPanel'
 import Checkout from './pages/Checkout'
 import BookingConfirmation from './pages/BookingConfirmation'
+import WaitlistNotifications from './pages/WaitlistNotifications'
 import './App.css'
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
   const [attendeeSession, setAttendeeSession] = useState(null)
   const [selection, setSelection] = useState(null)
   const [booking, setBooking] = useState(null)
+  const [acceptedClaimHold, setAcceptedClaimHold] = useState(null)
 
   // Listen for browser popstate
   useEffect(() => {
@@ -73,6 +75,9 @@ function App() {
   }
 
   function navigateTo(view, ticketId) {
+    if (currentView === 'checkout' && view !== 'checkout') {
+      setAcceptedClaimHold(null)
+    }
     setCurrentView(view)
     if (ticketId) setSelectedTicketId(ticketId)
     const url = new URL(window.location.href)
@@ -85,6 +90,12 @@ function App() {
       if (ticketId) url.searchParams.set('ticketId', ticketId)
     }
     window.history.pushState({}, '', url)
+  }
+
+  function changeTickets() {
+    setAcceptedClaimHold(null)
+    setSelection(null)
+    setCurrentView('event')
   }
 
   // Top navigation header present across views
@@ -120,6 +131,24 @@ function App() {
       </div>
 
       <div style={{ display: 'flex', gap: '8px' }}>
+        {attendeeSession && (
+          <button
+            type="button"
+            onClick={() => navigateTo('notifications')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              background: currentView === 'notifications' ? 'var(--accent)' : 'transparent',
+              color: currentView === 'notifications' ? '#fff' : 'var(--text-h)',
+              cursor: 'pointer',
+              fontWeight: 500,
+              fontSize: '13px',
+            }}
+          >
+            Notifications
+          </button>
+        )}
         <button
           type="button"
           onClick={() => navigateTo('home')}
@@ -235,6 +264,27 @@ function App() {
     )
   }
 
+  if (currentView === 'notifications' && attendeeSession) {
+    return (
+      <>
+        {renderNav()}
+        <WaitlistNotifications
+          session={attendeeSession}
+          onBack={() => navigateTo('home')}
+          onClaimAccepted={({ claim, hold }) => {
+            setSelection({
+              event: claim.event,
+              tier: claim.tier,
+              quantity: hold.quantity,
+            })
+            setAcceptedClaimHold(hold)
+            navigateTo('checkout')
+          }}
+        />
+      </>
+    )
+  }
+
   // NFR-005: screens 3 and 4 of the booking journey
   if (currentView === 'checkout' && selection) {
     return (
@@ -243,10 +293,12 @@ function App() {
         <Checkout
           selection={selection}
           session={attendeeSession}
+          initialHold={acceptedClaimHold}
           onSession={setAttendeeSession}
-          onBack={() => setCurrentView('event')}
+          onBack={changeTickets}
           onConfirmed={(b) => {
             setBooking(b)
+            setAcceptedClaimHold(null)
             setCurrentView('confirmation')
           }}
         />
@@ -274,8 +326,11 @@ function App() {
         {renderNav()}
         <EventDetails
           eventId={selectedEventId}
+          session={attendeeSession}
+          onSession={setAttendeeSession}
           onBack={() => navigateTo('home')}
           onCheckout={(sel) => {
+            setAcceptedClaimHold(null)
             setSelection(sel)
             setCurrentView('checkout')
           }}

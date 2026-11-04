@@ -13,12 +13,12 @@ function secondsLeft(expiresAt) {
  * NFR-005 screen 3: sign in (inline, no extra screen), hold seats for 10
  * minutes (FR-008) and confirm the booking (FR-010).
  */
-function Checkout({ selection, session, onSession, onBack, onConfirmed }) {
+function Checkout({ selection, session, initialHold, onSession, onBack, onConfirmed }) {
   const { event, tier, quantity } = selection
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [hold, setHold] = useState(null)
-  const [remaining, setRemaining] = useState(null)
+  const [hold, setHold] = useState(initialHold || null)
+  const [remaining, setRemaining] = useState(initialHold ? secondsLeft(initialHold.expiresAt) : null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const total = tier.price * quantity
