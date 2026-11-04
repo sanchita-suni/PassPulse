@@ -68,6 +68,15 @@ describe('OPS-001 PostgreSQL schema', () => {
     );
   });
 
+  test('bookings require persistent user and event records', async () => {
+    await expectReject(
+      "INSERT INTO bookings (id, user_id, event_id, total_amount) VALUES ('BKG-1', 'NOPE', 'EVT-1', 0)"
+    );
+    await expectReject(
+      "INSERT INTO bookings (id, user_id, event_id, total_amount) VALUES ('BKG-2', 'USR-ATT-1', 'NOPE', 0)"
+    );
+  });
+
   test('rejects an illegal event status and zero capacity', async () => {
     await expectReject(
       "INSERT INTO events (id, organizer_id, title, category, venue, event_date, capacity, status) VALUES ('EVT-3', 'USR-ORG-1', 'T', 'C', 'V', now(), 10, 'OPEN')"

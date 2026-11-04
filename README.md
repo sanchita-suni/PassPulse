@@ -31,7 +31,7 @@ The system addresses these with Redis-backed TTL inventory locks over PostgreSQL
 
 **Frontend** React.js (SPA) · Tailwind CSS · html5-qrcode
 **Backend** Node.js v20.x · Express.js · JWT
-**Data** PostgreSQL 16 (ACID transactions) · Redis 7 (TTL locks, waitlist queues)
+**Data** PostgreSQL 16 (ACID transactions; booking and FIFO waitlist source of truth) · Redis 7 (ticket-hold TTL projection)
 **DevOps** Docker & Docker Compose · Jenkins · GitHub Actions
 **Quality** Jest & Supertest (≥80% coverage) · SonarQube · ESLint · Postman / k6
 
@@ -41,10 +41,10 @@ The system addresses these with Redis-backed TTL inventory locks over PostgreSQL
 2. **Event discovery** — compound filters across category, date range, venue, price, and availability.
 3. **Event lifecycle** — DRAFT → PENDING_APPROVAL → PUBLISHED → LIVE → COMPLETED / CANCELLED.
 4. **Multi-tier inventory** — Early Bird, General, VIP tiers with independent quotas and pricing.
-5. **Atomic booking** — 10-minute Redis TTL hold, committed inside a PostgreSQL transaction; zero overselling.
+5. **Atomic booking** — `POST /api/bookings/hold` reserves inventory for 600 seconds; `POST /api/bookings/confirm` atomically converts an owned active hold into one booking and its tickets, using PostgreSQL pricing and QR/pass-compatible ticket records.
 6. **Dynamic QR passes** — HMAC-SHA256 signed, time-expiring, resistant to screenshot sharing.
 7. **Gate scanner** — camera-based validation under 200 ms with duplicate-entry rejection.
-8. **Automated waitlist** — FIFO queue with email notification and a 15-minute claim timer.
+8. **Automated waitlist** — PostgreSQL FIFO queue, durable in-app claim notifications, and 15-minute claims that reassign expired or declined inventory.
 9. **Telemetry & reports** — live scan velocity, attendance percentages, CSV/PDF exports.
 10. **Admin moderation** — event approval, account governance, audit log review.
 
@@ -61,9 +61,8 @@ PassPulse/
 │       ├── middleware/     # JWT verification, RBAC guard, error handlers
 │       ├── models/         # ORM schema definitions
 │       ├── routes/         # API route declarations
-│       ├── services/       # ticket hold, QR signing, waitlist
+│       ├── services/       # ticket holds, FIFO waitlist, claim/hold expiry
 │       ├── utils/          # HMAC generator, logger
-│       └── workers/        # waitlist claim timer
 └── client/                 # React SPA
     └── src/
         ├── components/     # Navbar, EventCard, TimerModal
@@ -88,7 +87,7 @@ docker compose up -d postgres redis
 cd server
 cp .env.example .env        # fill in DB_URL, REDIS_URL, JWT_SECRET, QR_HMAC_SECRET
 npm install
-npm run db:init             # applies server/db/schema.sql
+npm run db:init             # bootstraps the core schema and applies pending migrations
 npm run dev                 # http://localhost:5000
 
 # 4. Frontend (new terminal)
@@ -117,6 +116,11 @@ The API and client have no public ports; all traffic goes through the nginx prox
 
 `APP_ENV=development` in `.env` loads the demo users and events. Stop with `docker compose down`; add `-v` to also delete the database volume.
 
+Database changes are versioned in `server/db/migrations/`. `npm run db:migrate`
+applies pending migrations without reinitializing the core schema; the API also
+applies pending migrations at startup. Existing booking, ticket, check-in, and
+audit rows are retained and protected from deletion for at least one year.
+
 ### Environment Variables (`server/.env`)
 
 | Variable | Description |
@@ -125,7 +129,6 @@ The API and client have no public ports; all traffic goes through the nginx prox
 | `REDIS_URL` | Redis connection string |
 | `JWT_SECRET` | Signing secret for access tokens |
 | `QR_HMAC_SECRET` | Signing secret for QR pass payloads |
-| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | Nodemailer credentials for booking and waitlist emails |
 | `PORT` | API port (default 5000) |
 
 Never commit `.env` — only `.env.example` is tracked.
@@ -171,5 +174,3 @@ Six 2-week Agile Scrum sprints:
 - [`docs/SPRINT_PLAN.md`](docs/SPRINT_PLAN.md) — Agile Sprint Plan & Work Allocations
 - [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) — Git workflow, branch protections, and CI/CD policies
 - [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) — Architectural and requirement deviations register
-
-
