@@ -242,6 +242,66 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     expect(await inventory()).toMatchObject({ quota: 1, sold: 0, reserved: 1 });
   });
 
+  test('validates hold inputs, mirrored references, and active account status', async () => {
+    const invalidRequests = [
+      { userId: null, eventId, tierId, quantity: 1 },
+      { userId, eventId: null, tierId, quantity: 1 },
+      { userId, eventId: ' ', tierId, quantity: 1 },
+      { userId, eventId, tierId: null, quantity: 1 },
+      { userId, eventId, tierId: ' ', quantity: 1 },
+      { userId, eventId, tierId, quantity: 1.5 },
+      { userId, eventId, tierId, quantity: 0 },
+    ];
+    for (const requestData of invalidRequests) {
+      await expect(createHold(requestData)).rejects.toMatchObject({
+        status: requestData.userId ? 400 : 401,
+        code: requestData.userId ? 'INVALID_HOLD_REQUEST' : 'UNAUTHENTICATED',
+      });
+    }
+
+    await expect(createHold({
+      userId: `USR-MISSING-${crypto.randomUUID()}`,
+      eventId,
+      tierId,
+      quantity: 1,
+    })).rejects.toMatchObject({ status: 401, code: 'USER_NOT_FOUND' });
+
+    await expect(createHold({
+      userId,
+      eventId: `EVT-MISSING-${crypto.randomUUID()}`,
+      tierId,
+      quantity: 1,
+    })).rejects.toMatchObject({ status: 404, code: 'EVENT_NOT_FOUND' });
+
+    await expect(createHold({
+      userId,
+      eventId,
+      tierId: `TIER-MISSING-${crypto.randomUUID()}`,
+      quantity: 1,
+    })).rejects.toMatchObject({ status: 404, code: 'TIER_NOT_FOUND' });
+
+    await pool.query('UPDATE users SET is_active = FALSE WHERE id = $1', [userId]);
+    await expect(createHold({ userId, eventId, tierId, quantity: 1 }))
+      .rejects.toMatchObject({ status: 403, code: 'ACCOUNT_DEACTIVATED' });
+  });
+
+  test('rejects holds for unpublished or flagged events and over-limit quantities', async () => {
+    await pool.query('UPDATE events SET status = $2 WHERE id = $1', [eventId, 'DRAFT']);
+    await expect(createHold({ userId, eventId, tierId, quantity: 1 }))
+      .rejects.toMatchObject({ status: 409, code: 'EVENT_NOT_ON_SALE' });
+
+    await pool.query(
+      'UPDATE events SET status = $2, is_flagged = TRUE WHERE id = $1',
+      [eventId, 'PUBLISHED']
+    );
+    await expect(createHold({ userId, eventId, tierId, quantity: 1 }))
+      .rejects.toMatchObject({ status: 409, code: 'EVENT_NOT_ON_SALE' });
+
+    await pool.query('UPDATE events SET is_flagged = FALSE WHERE id = $1', [eventId]);
+    await expect(createHold({ userId, eventId, tierId, quantity: 6 }))
+      .rejects.toMatchObject({ status: 400, code: 'ORDER_LIMIT_EXCEEDED' });
+  });
+
   test('NFR-003: one of 200 distinct attendees reserves the only available seat', async () => {
     const attendees = Array.from({ length: 200 }, () => {
       const id = `USR-NFR003-${crypto.randomUUID()}`;

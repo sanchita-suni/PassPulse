@@ -2,19 +2,24 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { runMigrations } = require('../src/config/migration-runner');
+const db = require('../src/config/db');
 
 function makeMigrationPool() {
   const applied = [];
   const executed = [];
   const counters = { begins: 0, commits: 0, rollbacks: 0, locks: 0, unlocks: 0, releases: 0 };
   let transactionApplied = null;
+  let failLock = false;
   let failUnlock = false;
   let failRollback = false;
 
   const client = {
     async query(sql, params = []) {
       const statement = sql.trim();
-      if (statement.startsWith('SELECT pg_advisory_lock')) counters.locks += 1;
+      if (statement.startsWith('SELECT pg_advisory_lock')) {
+        counters.locks += 1;
+        if (failLock) throw new Error('test lock failure');
+      }
       else if (statement.startsWith('SELECT pg_advisory_unlock')) {
         counters.unlocks += 1;
         if (failUnlock) throw new Error('test unlock failure');
@@ -57,6 +62,7 @@ function makeMigrationPool() {
     applied,
     executed,
     counters,
+    failLock(value) { failLock = value; },
     failUnlock(value) { failUnlock = value; },
     failRollback(value) { failRollback = value; },
   };
@@ -138,5 +144,45 @@ describe('versioned database migration runner', () => {
 
     fs.writeFileSync(path.join(directory, '09999_duplicate.sql'), 'SELECT 0;');
     await expect(runMigrations({ pool: fixture.pool, directory })).rejects.toThrow('Duplicate migration version: 9999');
+  });
+
+  test('uses the configured default pool and migration directory', async () => {
+    const fixture = makeMigrationPool();
+    db.setPool(fixture.pool);
+    try {
+      await expect(runMigrations()).resolves.toEqual([
+        '0001_booking_and_retention_foundation.sql',
+        '0002_fifo_waitlist_claim_allocations.sql',
+      ]);
+    } finally {
+      db.setPool(null);
+    }
+  });
+
+  test('rejects applied migrations missing from disk and fills legacy checksums', async () => {
+    const missingFixture = makeMigrationPool();
+    missingFixture.applied.push({ migration_id: '0001_missing.sql', checksum: 'abc' });
+    await expect(runMigrations({ pool: missingFixture.pool, directory }))
+      .rejects.toThrow('Applied migration is missing from disk: 0001_missing.sql');
+
+    fs.writeFileSync(path.join(directory, '0001_legacy.sql'), 'SELECT 1;');
+    const legacyFixture = makeMigrationPool();
+    legacyFixture.applied.push({ migration_id: '0001_legacy.sql', checksum: null });
+    await expect(runMigrations({ pool: legacyFixture.pool, directory })).resolves.toEqual([]);
+    expect(legacyFixture.applied[0].checksum).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test('releases the migration client when locking or unlocking fails', async () => {
+    const lockFixture = makeMigrationPool();
+    lockFixture.failLock(true);
+    await expect(runMigrations({ pool: lockFixture.pool, directory }))
+      .rejects.toThrow('test lock failure');
+    expect(lockFixture.counters).toMatchObject({ locks: 1, unlocks: 0, releases: 1 });
+
+    const unlockFixture = makeMigrationPool();
+    unlockFixture.failUnlock(true);
+    await expect(runMigrations({ pool: unlockFixture.pool, directory }))
+      .rejects.toThrow('test unlock failure');
+    expect(unlockFixture.counters).toMatchObject({ locks: 1, unlocks: 1, releases: 1 });
   });
 });

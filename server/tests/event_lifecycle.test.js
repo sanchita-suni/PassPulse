@@ -5,7 +5,10 @@
 const request = require('supertest');
 const app = require('../src/app');
 const EventModel = require('../src/models/event.model');
-const { allowedTransitions } = require('../src/services/event_state.service');
+const {
+  allowedTransitions,
+  assertTransition,
+} = require('../src/services/event_state.service');
 const tokens = require('./helpers/tokens');
 
 beforeEach(async () => {
@@ -84,6 +87,12 @@ describe('PATCH /api/events/:id/status (FR-006)', () => {
     expect(allowedTransitions('PENDING_APPROVAL', 'ORGANIZER')).toEqual(['DRAFT', 'CANCELLED']);
     expect(allowedTransitions('PENDING_APPROVAL', 'ADMIN')).toEqual(['PUBLISHED', 'DRAFT', 'CANCELLED']);
     expect(allowedTransitions('UNKNOWN', 'ADMIN')).toEqual([]);
+  });
+
+  test('handles missing roles and unknown current states safely', () => {
+    expect(allowedTransitions('DRAFT')).toEqual(['PENDING_APPROVAL', 'CANCELLED']);
+    expect(() => assertTransition({ status: 'UNKNOWN', tiers: [] }, 'DRAFT'))
+      .toThrow('Cannot move an event from UNKNOWN to DRAFT');
   });
 });
 

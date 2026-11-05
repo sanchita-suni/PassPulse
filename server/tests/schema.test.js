@@ -117,4 +117,18 @@ describe('OPS-001 PostgreSQL schema', () => {
     process.env.DATABASE_URL = saved;
     if (saved === undefined) delete process.env.DATABASE_URL;
   });
+
+  test('lazily creates a PostgreSQL pool when DATABASE_URL is configured', async () => {
+    await db.closePool();
+    const saved = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/passpulse';
+    try {
+      expect(db.getPool()).toBeTruthy();
+      expect(db.isPoolInitialized()).toBe(true);
+    } finally {
+      await db.closePool();
+      if (saved === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = saved;
+    }
+  });
 });

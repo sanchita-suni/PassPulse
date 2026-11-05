@@ -1,14 +1,27 @@
+const crypto = require('crypto');
 const { generateQrPass } = require('./qr.service');
 const { registerTicket, clearTickets, initializeDefaultTickets } = require('./ticket.service');
+const db = require('../config/db');
+const {
+  createPostgresTestDatabase,
+  seedPersistentTicket,
+} = require('../../tests/helpers/postgres-test-database');
 
 const {
   processCheckIn,
   validateCheckInData,
+  processPersistentCheckIn,
+  getPersistentCheckInRecord,
+  getPersistentCheckInRecords,
   getCheckInRecord,
   getCheckInRecords,
   getCheckInCount,
   clearCheckInRecords,
 } = require('./checkin.service');
+
+const describePostgres = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL
+  ? describe
+  : describe.skip;
 
 describe('Check-in Service (FR-014 / Issue #26)', () => {
   const baseData = {
@@ -18,6 +31,15 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
   };
 
   let qrData;
+  let cleanupTestDatabase;
+
+  beforeAll(async () => {
+    cleanupTestDatabase = await createPostgresTestDatabase();
+  });
+
+  afterAll(async () => {
+    if (cleanupTestDatabase) await cleanupTestDatabase();
+  });
 
   beforeEach(async () => {
     clearCheckInRecords();
@@ -225,6 +247,37 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
     expect(getCheckInCount()).toBe(0);
   });
 
+  test('uses request statuses for partial legacy tickets and rejects tampered QR signatures', () => {
+    const tampered = JSON.parse(qrData);
+    tampered.ticketId = 'TKT-TAMPERED-001';
+    const invalid = processCheckIn({
+      qrData: JSON.stringify(tampered),
+      eventId: baseData.eventId,
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'CONFIRMED',
+    });
+    expect(invalid).toMatchObject({ success: false, reason: 'INVALID_SIGNATURE' });
+    expect(getCheckInCount()).toBe(0);
+
+    const ticket = registerTicket({
+      ticketId: baseData.ticketId,
+      eventId: baseData.eventId,
+      userId: baseData.userId,
+      ticketStatus: null,
+      bookingConfirmationStatus: '',
+    });
+    const accepted = processCheckIn({
+      qrData,
+      eventId: baseData.eventId,
+      ticketStatus: 'VALID',
+      bookingConfirmationStatus: 'CONFIRMED',
+    });
+
+    expect(accepted.success).toBe(true);
+    expect(ticket.isCheckedIn).toBe(true);
+    expect(ticket.checkedInAt).toBe(accepted.checkIn.checkedInAt);
+  });
+
   test('9. Rejects a QR belonging to another event', () => {
     const result = processCheckIn({
       qrData,
@@ -279,5 +332,85 @@ describe('Check-in Service (FR-014 / Issue #26)', () => {
     expect(getCheckInCount(baseData.eventId)).toBe(1);
     expect(getCheckInCount('EVT-OTHER-002')).toBe(1);
     expect(getCheckInRecords(baseData.eventId)).toHaveLength(1);
+  });
+
+  describePostgres('PostgreSQL check-in persistence', () => {
+    let fixture;
+    let persistentQrData;
+
+    beforeEach(async () => {
+      fixture = {
+        ticketId: `TKT-PERSISTENT-${crypto.randomUUID()}`,
+        eventId: `EVT-PERSISTENT-${crypto.randomUUID()}`,
+        userId: `USR-PERSISTENT-${crypto.randomUUID()}`,
+      };
+      await seedPersistentTicket(db.getPool(), fixture);
+      const pass = await generateQrPass({
+        ...fixture,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
+      persistentQrData = pass.qrData;
+    });
+
+    test('records a persistent check-in and exposes filtered and unfiltered records', async () => {
+      const result = await processPersistentCheckIn({
+        qrData: JSON.parse(persistentQrData),
+        eventId: fixture.eventId,
+        ipAddress: '127.0.0.1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.checkIn).toMatchObject({
+        ticketId: fixture.ticketId,
+        eventId: fixture.eventId,
+        userId: fixture.userId,
+        scannedBy: null,
+        ticketStatus: 'VALID',
+        bookingConfirmationStatus: 'CONFIRMED',
+      });
+      const record = await getPersistentCheckInRecord(fixture.ticketId);
+      expect(record).toMatchObject(result.checkIn);
+      expect(await getPersistentCheckInRecord(null)).toBeNull();
+      expect(await getPersistentCheckInRecord('TKT-NOT-RECORDED')).toBeNull();
+      await expect(getPersistentCheckInRecords()).resolves.toEqual([record]);
+      await expect(getPersistentCheckInRecords(fixture.eventId)).resolves.toEqual([record]);
+      await expect(getPersistentCheckInRecords('EVT-NOT-RECORDED')).resolves.toEqual([]);
+    });
+
+    test('audits malformed QR data, missing tickets, and scans for another event', async () => {
+      const malformed = await processPersistentCheckIn({
+        qrData: 'not-json',
+        eventId: fixture.eventId,
+      });
+      expect(malformed).toMatchObject({ success: false, reason: 'INVALID_QR_FORMAT' });
+
+      const missingPass = await generateQrPass({
+        ...fixture,
+        ticketId: `TKT-MISSING-${crypto.randomUUID()}`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
+      const missing = await processPersistentCheckIn({
+        qrData: missingPass.qrData,
+        eventId: fixture.eventId,
+      });
+      expect(missing).toMatchObject({ success: false, reason: 'TICKET_NOT_FOUND' });
+
+      const wrongEvent = await processPersistentCheckIn({
+        qrData: persistentQrData,
+        eventId: `EVT-WRONG-${crypto.randomUUID()}`,
+      });
+      expect(wrongEvent).toMatchObject({ success: false, reason: 'WRONG_EVENT' });
+
+      const { rows } = await db.query(
+        `SELECT action, target FROM audit_log
+         WHERE action = 'CHECK_IN_REJECTED'
+         ORDER BY created_at, id`
+      );
+      expect(rows).toEqual(expect.arrayContaining([
+        { action: 'CHECK_IN_REJECTED', target: null },
+        expect.objectContaining({ action: 'CHECK_IN_REJECTED', target: expect.stringMatching(/^TKT-MISSING-/) }),
+        { action: 'CHECK_IN_REJECTED', target: fixture.ticketId },
+      ]));
+    });
   });
 });
