@@ -1,6 +1,11 @@
-const { processCheckIn } = require('../services/checkin.service');
+const {
+  processCheckIn,
+  processPersistentCheckIn,
+} = require('../services/checkin.service');
+const { getPersistentTicketById } = require('../services/ticket.service');
+const { isPoolInitialized } = require('../config/db');
 
-function verifyCheckIn(req, res, next) {
+async function verifyCheckIn(req, res, next) {
   try {
     const {
       qrData,
@@ -23,12 +28,33 @@ function verifyCheckIn(req, res, next) {
       });
     }
 
-    const result = processCheckIn({
-      qrData,
-      eventId,
-      ticketStatus,
-      bookingConfirmationStatus,
-    });
+    let persistentTicket = null;
+    try {
+      const parsedQr = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+      if (parsedQr && parsedQr.ticketId) {
+        persistentTicket = await getPersistentTicketById(parsedQr.ticketId);
+      }
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        // processCheckIn reports malformed QR payloads using the existing API contract.
+      } else {
+        return next(error);
+      }
+    }
+
+    const result = persistentTicket || isPoolInitialized()
+      ? await processPersistentCheckIn({
+        qrData,
+        eventId,
+        scannedBy: req.user && (req.user.userId || req.user.id),
+        ipAddress: req.ip,
+      })
+      : processCheckIn({
+        qrData,
+        eventId,
+        ticketStatus,
+        bookingConfirmationStatus,
+      });
 
     if (!result.success) {
       const statusByReason = {

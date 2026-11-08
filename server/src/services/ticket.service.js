@@ -1,4 +1,5 @@
 const { generateQrPass } = require('./qr.service');
+const { getPool, isPoolInitialized } = require('../config/db');
 
 /**
  * In-memory confirmed tickets repository.
@@ -172,6 +173,82 @@ function getTicketsByUserId(userId) {
   return results;
 }
 
+function getOptionalPool() {
+  if (!isPoolInitialized()) return null;
+  try {
+    return getPool();
+  } catch (error) {
+    if (error.message === 'DATABASE_URL is not configured') return null;
+    throw error;
+  }
+}
+
+function mapDatabaseTicket(row) {
+  return {
+    ticketId: row.ticket_id,
+    id: row.ticket_id,
+    bookingId: row.booking_id,
+    bookingReference: row.booking_id,
+    eventId: row.event_id,
+    eventName: row.event_name,
+    eventCategory: row.event_category,
+    eventDate: row.event_date,
+    venue: row.venue,
+    userId: row.user_id,
+    attendeeName: row.attendee_name,
+    attendeeEmail: row.attendee_email,
+    ticketTier: row.tier_name,
+    price: Number(row.price),
+    bookingConfirmationStatus: row.booking_status,
+    ticketStatus: row.ticket_status,
+    expiresAt: row.expires_at,
+    issuedAt: row.issued_at,
+    createdAt: row.issued_at,
+  };
+}
+
+const PERSISTED_TICKET_SELECT = `
+  SELECT ticket.id AS ticket_id, ticket.booking_id, ticket.status AS ticket_status,
+         ticket.issued_at, booking.event_id, booking.user_id,
+         booking.status AS booking_status, event.title AS event_name,
+         event.category AS event_category, event.event_date, event.venue,
+         GREATEST(event.event_date + INTERVAL '1 day',
+                  ticket.issued_at + INTERVAL '1 day') AS expires_at,
+         attendee.full_name AS attendee_name, attendee.email AS attendee_email,
+         tier.name AS tier_name, tier.price
+  FROM tickets AS ticket
+  JOIN bookings AS booking ON booking.id = ticket.booking_id
+  JOIN events AS event ON event.id = booking.event_id
+  JOIN users AS attendee ON attendee.id = booking.user_id
+  JOIN ticket_tiers AS tier ON tier.id = ticket.tier_id AND tier.event_id = booking.event_id
+`;
+
+async function getPersistentTicketById(ticketId) {
+  const pool = getOptionalPool();
+  if (!pool) return null;
+  const result = await pool.query(`${PERSISTED_TICKET_SELECT} WHERE ticket.id = $1`, [ticketId]);
+  if (!result.rowCount) return null;
+  return registerTicket(mapDatabaseTicket(result.rows[0]));
+}
+
+async function getPersistentTicketsByUserId(userId) {
+  if (!userId) return [];
+  const pool = getOptionalPool();
+  if (!pool) return getTicketsByUserId(userId);
+  const result = await pool.query(
+    `${PERSISTED_TICKET_SELECT}
+     WHERE booking.user_id = $1
+     ORDER BY ticket.issued_at DESC, ticket.id`,
+    [userId]
+  );
+  const tickets = new Map(getTicketsByUserId(userId).map((ticket) => [ticket.ticketId, ticket]));
+  for (const row of result.rows) {
+    const ticket = registerTicket(mapDatabaseTicket(row));
+    tickets.set(ticket.ticketId, ticket);
+  }
+  return [...tickets.values()];
+}
+
 /**
  * Clear all tickets (used for testing).
  */
@@ -199,7 +276,7 @@ async function getAttendeePass({ ticketId, requestingUser }) {
     };
   }
 
-  const ticket = getTicketById(ticketId);
+  const ticket = getTicketById(ticketId) || await getPersistentTicketById(ticketId);
 
   if (!ticket) {
     return {
@@ -299,8 +376,11 @@ async function getAttendeePass({ ticketId, requestingUser }) {
 
 module.exports = {
   getTicketById,
+  getPersistentTicketById,
+  mapDatabaseTicket,
   registerTicket,
   getTicketsByUserId,
+  getPersistentTicketsByUserId,
   clearTickets,
   initializeDefaultTickets,
   getAttendeePass,

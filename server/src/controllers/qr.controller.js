@@ -1,5 +1,12 @@
 const { generateQrPass } = require('../services/qr.service');
-const { getAttendeePass, getTicketsByUserId, getTicketById } = require('../services/ticket.service');
+
+const {
+  getAttendeePass,
+  getTicketsByUserId,
+  getTicketById,
+  getPersistentTicketsByUserId,
+} = require('../services/ticket.service');
+
 const { createToken } = require('../middleware/auth.middleware');
 
 /**
@@ -142,7 +149,7 @@ async function getAttendeeTicketsController(req, res, next) {
       });
     }
 
-    const tickets = getTicketsByUserId(userId);
+    const tickets = await getPersistentTicketsByUserId(userId);
 
     return res.status(200).json({
       status: 'success',

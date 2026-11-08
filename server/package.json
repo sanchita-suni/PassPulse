@@ -7,7 +7,10 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "db:init": "node scripts/db-init.js",
+    "db:migrate": "node scripts/db-migrate.js",
+    "bench:search": "node scripts/bench-search.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,11 +19,32 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.12.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "nodemon": "^3.1.4",
+    "pg-mem": "^3.0.14",
     "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js",
+      "!src/server.js"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 80,
+        "branches": 80,
+        "lines": 80
+      }
+    }
   }
 }

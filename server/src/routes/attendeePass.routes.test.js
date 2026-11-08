@@ -6,11 +6,40 @@ const app = require('../app');
 const { createToken } = require('../middleware/auth.middleware');
 const { initializeDefaultTickets } = require('../services/ticket.service');
 const { clearCheckInRecords } = require('../services/checkin.service');
+const db = require('../config/db');
+const {
+  createPostgresTestDatabase,
+  seedPersistentTicket,
+} = require('../../tests/helpers/postgres-test-database');
 
 describe('Attendee Digital Pass API Integration (FR-012)', () => {
+  let cleanupTestDatabase;
   let alexToken;
   let sarahToken;
   let gateStaffToken;
+
+  beforeAll(async () => {
+    cleanupTestDatabase = await createPostgresTestDatabase();
+    if (cleanupTestDatabase) {
+      await seedPersistentTicket(db.getPool(), {
+        ticketId: 'TKT-CONFIRMED-001',
+        eventId: 'EVT-TECH-2026',
+        userId: 'USR-ATTENDEE-001',
+        eventName: 'TechSummit 2026',
+        eventCategory: 'Tech Conference',
+        eventDate: '2026-11-15T09:30:00.000Z',
+        venue: 'Main Auditorium, PES Tech Campus',
+        attendeeName: 'Alex Johnson',
+        attendeeEmail: 'alex.johnson@example.com',
+        ticketTier: 'VIP Pass',
+        price: 799,
+      });
+    }
+  });
+
+  afterAll(async () => {
+    if (cleanupTestDatabase) await cleanupTestDatabase();
+  });
 
   beforeEach(() => {
     initializeDefaultTickets();

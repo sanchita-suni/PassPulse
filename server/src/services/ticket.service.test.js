@@ -7,8 +7,19 @@ const {
   initializeDefaultTickets,
 } = require('./ticket.service');
 const { verifyQrPass } = require('./qr.service');
+const { createPostgresTestDatabase } = require('../../tests/helpers/postgres-test-database');
 
 describe('Ticket Service & Attendee Pass Validation (FR-012)', () => {
+  let cleanupTestDatabase;
+
+  beforeAll(async () => {
+    cleanupTestDatabase = await createPostgresTestDatabase();
+  });
+
+  afterAll(async () => {
+    if (cleanupTestDatabase) await cleanupTestDatabase();
+  });
+
   beforeEach(() => {
     initializeDefaultTickets();
   });

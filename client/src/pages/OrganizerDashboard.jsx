@@ -1,0 +1,291 @@
+import { useCallback, useEffect, useState } from 'react'
+import RoleLogin from '../components/RoleLogin'
+import TierManager from '../components/TierManager'
+import {
+  fetchMyEvents,
+  createEvent,
+  updateEvent,
+  cancelEvent,
+  changeEventStatus,
+} from '../services/eventsApi'
+import { formatDate } from '../utils/format'
+import './EventCatalog.css'
+
+// FR-006: the next steps an organizer can take (publishing is done by an admin)
+const ORGANIZER_ACTIONS = {
+  DRAFT: [['PENDING_APPROVAL', 'Submit for approval']],
+  PENDING_APPROVAL: [['DRAFT', 'Withdraw to draft']],
+  PUBLISHED: [['LIVE', 'Go live']],
+  LIVE: [['COMPLETED', 'Mark completed']],
+}
+
+function soldCount(ev) {
+  return ev.tiers.reduce((sum, t) => sum + t.sold, 0)
+}
+
+const BLANK = { title: '', description: '', category: '', venue: '', eventDate: '', capacity: '' }
+
+function toLocalInput(iso) {
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function EventForm({ initial, submitLabel, onSubmit, onCancel }) {
+  const [form, setForm] = useState(initial)
+  const [error, setError] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
+    setSaving(true)
+    try {
+      await onSubmit({
+        ...form,
+        capacity: Number(form.capacity),
+        eventDate: form.eventDate ? new Date(form.eventDate).toISOString() : '',
+      })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="panel" onSubmit={handleSubmit}>
+      {error && <div className="notice error" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="form-grid">
+        <label>
+          Title
+          <input value={form.title} onChange={(e) => update('title', e.target.value)} required />
+        </label>
+        <label>
+          Category
+          <input value={form.category} onChange={(e) => update('category', e.target.value)} required />
+        </label>
+        <label>
+          Venue
+          <input value={form.venue} onChange={(e) => update('venue', e.target.value)} required />
+        </label>
+        <label>
+          Date and time
+          <input
+            type="datetime-local"
+            value={form.eventDate}
+            onChange={(e) => update('eventDate', e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Capacity
+          <input
+            type="number"
+            min="1"
+            value={form.capacity}
+            onChange={(e) => update('capacity', e.target.value)}
+            required
+          />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Description
+          <textarea rows="3" value={form.description} onChange={(e) => update('description', e.target.value)} />
+        </label>
+      </div>
+      <div className="catalog-actions" style={{ marginTop: 12 }}>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{submitLabel}</button>
+        <button type="button" className="btn" onClick={onCancel}>Close</button>
+      </div>
+    </form>
+  )
+}
+
+/**
+ * FR-005: organizer screen to create, edit, schedule and cancel own events.
+ */
+function OrganizerDashboard({ session, onSession }) {
+  const [events, setEvents] = useState([])
+  const [mode, setMode] = useState(null)
+  const [message, setMessage] = useState(null)
+  const [error, setError] = useState(null)
+
+  const token = session?.token
+
+  const load = useCallback(() => {
+    if (!token) return Promise.resolve()
+    return fetchMyEvents(token)
+      .then((data) => setEvents(data.events))
+      .catch((err) => setError(err.message))
+  }, [token])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (!session) {
+    return (
+      <RoleLogin
+        title="Organizer sign in"
+        hint="Demo account: organizer@passpulse.io / Organizer@2026"
+        allowedRoles={['ORGANIZER', 'ADMIN']}
+        onLoginSuccess={onSession}
+      />
+    )
+  }
+
+  async function handleCreate(data) {
+    const res = await createEvent(data, token)
+    setMode(null)
+    setMessage(`Created "${res.event.title}" as a draft.`)
+    await load()
+  }
+
+  async function handleEdit(ev, data) {
+    const sold = soldCount(ev)
+    const dateChanged = new Date(data.eventDate).getTime() !== new Date(ev.eventDate).getTime()
+    const changes = { ...data }
+    if (!dateChanged) delete changes.eventDate
+    if (dateChanged && sold > 0) {
+      // BR-006: holders must be told about a new date
+      if (!window.confirm(`${sold} tickets are sold. Change the date and notify every ticket holder?`)) return
+      changes.notifyHolders = true
+    }
+    const res = await updateEvent(ev.id, changes, token)
+    setMode(null)
+    setMessage(`Saved changes to "${res.event.title}".`)
+    await load()
+  }
+
+  async function handleCancel(ev) {
+    setError(null)
+    const sold = soldCount(ev)
+    const prompt = sold > 0
+      ? `${sold} tickets are sold. Cancel "${ev.title}" and notify every ticket holder?`
+      : `Cancel "${ev.title}"?`
+    if (!window.confirm(prompt)) return
+    try {
+      await cancelEvent(ev.id, token, { notifyHolders: sold > 0 })
+      setMessage(`Cancelled "${ev.title}".`)
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function handleStatus(ev, status, label) {
+    setError(null)
+    try {
+      await changeEventStatus(ev.id, status, token)
+      setMessage(`${label}: "${ev.title}" is now ${status}.`)
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const closed = (status) => status === 'CANCELLED' || status === 'COMPLETED'
+
+  return (
+    <section className="catalog">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <h1>My events</h1>
+          <p className="muted">Signed in as {session.user.fullName} ({session.user.role})</p>
+        </div>
+        <div className="catalog-actions">
+          <button type="button" className="btn btn-primary" onClick={() => setMode({ type: 'create' })}>
+            New event
+          </button>
+          <button type="button" className="btn" onClick={() => onSession(null)}>Sign out</button>
+        </div>
+      </div>
+
+      {message && <div className="notice success" style={{ marginTop: 12 }}>{message}</div>}
+      {error && <div className="notice error" style={{ marginTop: 12 }}>{error}</div>}
+
+      {mode?.type === 'create' && (
+        <EventForm initial={BLANK} submitLabel="Save as draft" onSubmit={handleCreate} onCancel={() => setMode(null)} />
+      )}
+
+      {events.length === 0 ? (
+        <div className="empty-state" style={{ marginTop: 16 }}>You have no events yet.</div>
+      ) : (
+        events.map((ev) => (
+          <div key={ev.id} className="panel">
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <span className="chip">{ev.status}</span>
+                <h3 style={{ margin: '6px 0', color: 'var(--text-h)' }}>{ev.title}</h3>
+                <div className="muted">
+                  {formatDate(ev.eventDate)} at {ev.venue}, capacity {ev.capacity}, {soldCount(ev)} sold
+                </div>
+                {ev.status === 'PENDING_APPROVAL' && <div className="muted">Waiting for admin approval.</div>}
+                {ev.notices.length > 0 && (
+                  <div className="muted">
+                    Last notice sent to {ev.notices[ev.notices.length - 1].recipients} holders:{' '}
+                    {ev.notices[ev.notices.length - 1].message}
+                  </div>
+                )}
+              </div>
+              <div className="catalog-actions" style={{ flexWrap: 'wrap' }}>
+                {(ORGANIZER_ACTIONS[ev.status] || []).map(([status, label]) => (
+                  <button
+                    key={status}
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => handleStatus(ev, status, label)}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={closed(ev.status)}
+                  onClick={() => setMode({ type: 'edit', id: ev.id })}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setMode(mode?.type === 'tiers' && mode.id === ev.id ? null : { type: 'tiers', id: ev.id })}
+                >
+                  Tiers ({ev.tiers.length})
+                </button>
+                <button type="button" className="btn" disabled={closed(ev.status)} onClick={() => handleCancel(ev)}>
+                  Cancel event
+                </button>
+              </div>
+            </div>
+            {mode?.type === 'tiers' && mode.id === ev.id && (
+              <TierManager event={ev} token={token} onChanged={load} />
+            )}
+            {mode?.type === 'edit' && mode.id === ev.id && (
+              <EventForm
+                initial={{
+                  title: ev.title,
+                  description: ev.description,
+                  category: ev.category,
+                  venue: ev.venue,
+                  eventDate: toLocalInput(ev.eventDate),
+                  capacity: ev.capacity,
+                }}
+                submitLabel="Save changes"
+                onSubmit={(data) => handleEdit(ev, data)}
+                onCancel={() => setMode(null)}
+              />
+            )}
+          </div>
+        ))
+      )}
+    </section>
+  )
+}
+
+export default OrganizerDashboard
