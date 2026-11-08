@@ -31,4 +31,8 @@ module.exports = {
   deactivateUser: handle(async (req) => ({ user: await adminService.setUserActive(req.params.id, req.user, false, req.ip) })),
   reactivateUser: handle(async (req) => ({ user: await adminService.setUserActive(req.params.id, req.user, true, req.ip) })),
   listAuditLogs: handle(async (req) => adminService.listAuditLogs(req.query)),
+  getAvailability: handle(async (req) => {
+    const summary = await adminService.getAvailability(req.query);
+    return { ...summary, data: summary };
+  }),
 };

@@ -10,6 +10,7 @@ const checkinRoutes = require('./routes/checkin.routes');
 const eventRoutes = require('./routes/event.routes');
 const adminRoutes = require('./routes/admin.routes');
 const bookingRoutes = require('./routes/booking.routes');
+const healthRoutes = require('./routes/health.routes');
 
 const app = express();
 
@@ -28,14 +29,7 @@ app.use('/api/checkin', checkinRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/bookings', bookingRoutes);
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'PassPulse API is running'
-  });
-});
+app.use('/api/health', healthRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

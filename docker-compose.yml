@@ -51,6 +51,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       QR_HMAC_SECRET: ${QR_HMAC_SECRET:?Set QR_HMAC_SECRET in .env}
+    volumes:
+      - server_data:/app/data
     expose:
       - "5000"
     depends_on:
@@ -88,3 +90,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  server_data:

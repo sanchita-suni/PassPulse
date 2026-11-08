@@ -10,7 +10,9 @@
     "test:coverage": "jest --coverage",
     "db:init": "node scripts/db-init.js",
     "db:migrate": "node scripts/db-migrate.js",
-    "bench:search": "node scripts/bench-search.js"
+    "bench:search": "node scripts/bench-search.js",
+    "report:availability": "node scripts/availability-report.js",
+    "monitor:availability": "node scripts/monitor-availability.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

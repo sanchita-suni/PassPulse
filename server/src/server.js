@@ -6,6 +6,8 @@ const { runMigrations } = require('./config/migration-runner');
 const { closePool } = require('./config/db');
 const { closeRedis } = require('./config/redis');
 const { startHoldExpiryWorker, stopHoldExpiryWorker } = require('./services/hold-expiry.worker');
+const { startAvailabilityPoller, stopAvailabilityPoller } = require('./services/availability.service');
+const { setShuttingDown } = require('./services/health.service');
 
 const PORT = process.env.PORT || 5000;
 let httpServer;
@@ -16,6 +18,7 @@ async function start() {
     console.log(`Applied database migrations: ${applied.join(', ')}`);
   }
   startHoldExpiryWorker();
+  startAvailabilityPoller();
   httpServer = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
@@ -23,13 +26,21 @@ async function start() {
 
 start().catch(async (error) => {
   console.error(`Server startup failed: ${error.message}`);
-  await stopHoldExpiryWorker();
-  await Promise.all([closePool(), closeRedis()]);
+  await Promise.allSettled([
+    stopHoldExpiryWorker(),
+    stopAvailabilityPoller(),
+    closePool(),
+    closeRedis(),
+  ]);
   process.exitCode = 1;
 });
 
 async function shutdown() {
-  await stopHoldExpiryWorker();
+  setShuttingDown(true);
+  await Promise.allSettled([
+    stopHoldExpiryWorker(),
+    stopAvailabilityPoller(),
+  ]);
   if (httpServer) {
     await new Promise((resolve, reject) => {
       httpServer.close((error) => (error ? reject(error) : resolve()));

@@ -11,6 +11,9 @@ router.use(authenticate, authorize(['ADMIN']));
 // Audit log review endpoint (SEC-005 AC-3)
 router.get('/audit-logs', controller.listAuditLogs);
 
+// Availability monitoring review endpoint (NFR-004 AC-3)
+router.get('/availability', controller.getAvailability);
+
 router.get('/events', controller.listEvents);
 router.post('/events/:id/approve', controller.approveEvent);
 router.post('/events/:id/reject', controller.rejectEvent);
