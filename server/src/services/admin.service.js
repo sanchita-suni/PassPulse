@@ -7,6 +7,7 @@ const EventModel = require('../models/event.model');
 const UserModel = require('../models/user.model');
 const { EventError, changeStatus } = require('./event.service');
 const auditService = require('./audit.service');
+const availabilityService = require('./availability.service');
 
 function adminId(user) {
   return (user && (user.id || user.userId)) || null;
@@ -145,6 +146,10 @@ async function listAuditLogs(query) {
   return auditService.getAuditLogs(query);
 }
 
+async function getAvailability(query) {
+  return availabilityService.getAvailabilitySummary(query);
+}
+
 module.exports = {
   listEvents,
   approveEvent,
@@ -155,4 +160,5 @@ module.exports = {
   listUsers,
   setUserActive,
   listAuditLogs,
+  getAvailability,
 };

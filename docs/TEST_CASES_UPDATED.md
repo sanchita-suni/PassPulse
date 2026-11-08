@@ -22,6 +22,7 @@ This document updates the baseline Software Test Plan (STP v1.0, recorded in `do
 | **v1.1** | Oct 2026 | Sprint 1 | Saatvik Gupta | Added `TC-AUTH-SEC-01` to `TC-AUTH-SEC-03` (CWE-269 Privilege Escalation Guard), `TC-AUTH-08`, `TC-AUTH-09` (Gate Staff Auth), `TC-SEC-01` to `TC-SEC-03` (RBAC & Signature tampering). |
 | **v1.2** | Oct 2026 | Sprint 2 | Saatvik Gupta / Sanchita | Added `TC-PROV-01` to `TC-PROV-05` (Admin User Provisioning), `TC-SEED-01` & `TC-SEED-02` (CWE-1188 Seeding Isolation), `TC-ADM-01` & `TC-ADM-02` (Account Deactivation). |
 | **v2.0** | Nov 2026 | Part-3 Testing | Saatvik Gupta | Added `TC-SEC-04` through `TC-SEC-07` (SQL Injection & XSS input mitigation for `SEC-003`), `TC-MID-01` through `TC-MID-05` (Security middleware edge cases & branch coverage). |
+| **v2.1** | Nov 2026 | Issue #35 (NFR-004) | Sambhram M | Added `TC-OPS-01.1` through `TC-OPS-01.13` (Health checks, 60s availability monitoring, outage tracking, SLA calculation, and admin availability review). |
 
 ---
 
@@ -325,7 +326,106 @@ This document updates the baseline Software Test Plan (STP v1.0, recorded in `do
 * **Actual Result:** **PASS**
 
 ---
+### 2.4 Health Checks and Availability Monitoring Test Cases (`NFR-004`, Issue #35)
+
+**Module Owner:** Sambhram M — DevOps & Security<br>
+**Test Suite Files:** `server/src/services/health.service.test.js`, `server/src/services/availability.service.test.js`, `server/tests/health.test.js`
+
+#### `TC-OPS-01.1`: Dependency Probing — PostgreSQL and Redis Healthy (AC-1)
+* **Requirement:** `NFR-004` (AC-1)
+* **Precondition:** PostgreSQL database pool and Redis connection are responsive.
+* **Test Input:** `GET /api/health`
+* **Expected Result:** HTTP 200 OK; response body contains `"status": "success"` (for `scripts/check-tls.sh` compatibility), `"healthy": true`, and individual dependency latencies.
+* **Actual Result:** **PASS** (Latency: < 5 ms)
+
+#### `TC-OPS-01.2`: Dependency Probing — PostgreSQL Failure Isolation & 503 Status (AC-1)
+* **Requirement:** `NFR-004` (AC-1)
+* **Precondition:** PostgreSQL pool query fails or times out; Redis is healthy.
+* **Test Input:** `GET /api/health`
+* **Expected Result:** HTTP 503 Service Unavailable; response contains `"healthy": false`, `dependencies.database.status: "down"`, and sanitized error string `"Database query failed"`.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.3`: Dependency Probing — Redis Ping Failure Isolation & 503 Status (AC-1)
+* **Requirement:** `NFR-004` (AC-1)
+* **Precondition:** PostgreSQL is healthy; Redis `ping()` fails or times out.
+* **Test Input:** `GET /api/health`
+* **Expected Result:** HTTP 503 Service Unavailable; response contains `"healthy": false`, `dependencies.redis.status: "down"`, and sanitized error string `"Redis ping failed"`.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.4`: Dependency Probing — Double Failure & Error Sanitization (AC-1)
+* **Requirement:** `NFR-004` (AC-1)
+* **Precondition:** Both PostgreSQL and Redis throw raw internal exceptions with stack traces / secrets.
+* **Test Input:** `GET /api/health`
+* **Expected Result:** HTTP 503 Service Unavailable; response strips internal secrets, passwords, and raw stack traces; outputs sanitized messages only.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.5`: Liveness Endpoint — Unconditional Shallow Check (AC-1)
+* **Requirement:** `NFR-004` (AC-1)
+* **Precondition:** External dependencies (PostgreSQL / Redis) are down.
+* **Test Input:** `GET /api/health/live`
+* **Expected Result:** HTTP 200 OK; confirms process is alive and event loop is responsive without querying external infrastructure.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.6`: Readiness Endpoint — Graceful Shutdown & Drain State Guard (AC-1)
+* **Requirement:** `NFR-004` (AC-1)
+* **Precondition:** Process enters graceful shutdown (`isShuttingDown = true`).
+* **Test Input:** `GET /api/health/ready`
+* **Expected Result:** HTTP 503 Service Unavailable; informs load balancer to cease traffic ingress during process termination.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.7`: One-Minute Poller — 60-Second Execution Interval & Singleton Loop Guard (AC-2)
+* **Requirement:** `NFR-004` (AC-2)
+* **Precondition:** Server boots up and invokes `startAvailabilityPoller()`.
+* **Test Input:** Call `startAvailabilityPoller()` twice in succession; advance mock timers by 60,000 ms.
+* **Expected Result:** Only one active polling interval runs; interval is configured to exactly 60 seconds (60000 ms); checks execute once per minute.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.8`: Poller Fault Resilience — Unhandled Probe Errors Do Not Crash Runtime (AC-2)
+* **Requirement:** `NFR-004` (AC-2)
+* **Precondition:** `checkHealth()` throws an unexpected unhandled rejection during periodic polling.
+* **Test Input:** Execute scheduled poll with rejected probe promise.
+* **Expected Result:** Error caught safely; downtime is recorded; Node.js process does not terminate or leak unhandled rejections.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.9`: Outage Tracking — Incident Capture, Duration & Root Cause (AC-3)
+* **Requirement:** `NFR-004` (AC-3)
+* **Precondition:** A simulated outage occurs for 2 poll intervals and recovers on the 3rd.
+* **Test Input:** Consecutive failure health checks followed by a successful health check.
+* **Expected Result:** Outage incident recorded with `startedAt`, `recoveredAt`, `durationSeconds` (120 s), `cause` (identifying failed dependency), and status transitioning from active to recovered.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.10`: State Persistence — Survival Across Server Restarts via State Store (AC-3)
+* **Requirement:** `NFR-004` (AC-3)
+* **Precondition:** Active outage and history recorded before process restart.
+* **Test Input:** Simulate server reboot, reloading state from `availability-state.json`.
+* **Expected Result:** All previous check counts, outage incidents, and ongoing downtime states are restored with complete fidelity.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.11`: Availability SLA Calculation — Verification Against 99.5% Uptime Target (AC-3)
+* **Requirement:** `NFR-004` (AC-3)
+* **Precondition:** Availability dataset of successful and failed intervals.
+* **Test Input:** Calculate metrics for 99.6% uptime vs 98.5% uptime.
+* **Expected Result:** Returns formatted percentage `99.60%` (`meetsTarget: true`) and `98.50%` (`meetsTarget: false` with target `99.5%`).
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.12`: Admin Review Endpoint — 401 Unauthenticated & 403 Non-Admin Guards (AC-3)
+* **Requirement:** `NFR-004` (AC-3)
+* **Precondition:** Requests sent without token or with ATTENDEE / ORGANIZER / GATE_STAFF tokens.
+* **Test Input:** `GET /api/admin/availability`
+* **Expected Result:** HTTP 401 for unauthenticated request; HTTP 403 FORBIDDEN for non-admin roles.
+* **Actual Result:** **PASS**
+
+#### `TC-OPS-01.13`: Admin Review Endpoint — 200 OK & Comprehensive Metrics Retrieval (AC-3)
+* **Requirement:** `NFR-004` (AC-3)
+* **Precondition:** Request authenticated with valid ADMIN JWT token.
+* **Test Input:** `GET /api/admin/availability`
+* **Expected Result:** HTTP 200 OK; returns `currentStatus`, `uptimePercentage`, `targetUptimePercentage: 99.5`, `meetsTarget`, `outages` array, and `checksSummary`.
+* **Actual Result:** **PASS**
+
+---
 ## 3. Summary of Updated Test Suite Execution
+
+### 3.1 Historical Execution Baseline (Pre-Issue #35 / Post-Issue #43)
 
 ```
 Test Suites: 22 passed, 22 of 26 total (4 integration suites skipped when TEST_DATABASE_URL is not set)
@@ -333,5 +433,21 @@ Tests:       285 passed, 36 skipped, 321 total (including 25 tests in audit.test
 Statements:  100% in audit.service.js
 Branches:    93.87% in audit.service.js
 Lines:       100% in audit.service.js
-Status:      100% Passed (Zero Defects)
+Status:      285 passed, 36 skipped, 0 failures (Previous Execution Baseline)
 ```
+
+### 3.2 Latest Execution Summary (Post-Issue #35 Implementation & Hardening)
+
+```
+Test Suites: 25 passed, 25 of 29 total (4 integration suites skipped when TEST_DATABASE_URL is not set)
+Tests:       346 passed, 36 skipped, 382 total (including 61 tests across health and availability suites)
+Statements:  99.09% in health & availability modules (100% in audit.service.js)
+Branches:    85.24% in health & availability modules (93.87% in audit.service.js)
+Lines:       100% in health & availability modules (100% in audit.service.js)
+Status:      346 passed, 36 skipped, 0 failures (Latest Execution)
+```
+
+#### Health & Availability Suite Breakdown (61 Tests Total)
+* `src/services/health.service.test.js`: 19 passed
+* `src/services/availability.service.test.js`: 29 passed
+* `tests/health.test.js`: 13 passed

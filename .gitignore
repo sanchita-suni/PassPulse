@@ -42,3 +42,7 @@ deploy/certs/
 # Database persistence files
 postgres_data/
 redis_data/
+
+# Runtime state files (NFR-004)
+server/data/
+*.state.json
