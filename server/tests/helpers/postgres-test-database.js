@@ -8,7 +8,7 @@ const { runMigrations } = require('../../src/config/migration-runner');
 const schemaPath = path.join(__dirname, '..', '..', 'db', 'schema.sql');
 
 async function createPostgresTestDatabase() {
-  const connectionString = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  const connectionString = process.env.TEST_DATABASE_URL;
   if (!connectionString) return null;
 
   const schemaName = `passpulse_test_${process.pid}_${crypto.randomBytes(6).toString('hex')}`;

@@ -1,5 +1,5 @@
 const { generateQrPass } = require('./qr.service');
-const { getPool } = require('../config/db');
+const { getPool, isPoolInitialized } = require('../config/db');
 
 /**
  * In-memory confirmed tickets repository.
@@ -174,6 +174,7 @@ function getTicketsByUserId(userId) {
 }
 
 function getOptionalPool() {
+  if (!isPoolInitialized()) return null;
   try {
     return getPool();
   } catch (error) {

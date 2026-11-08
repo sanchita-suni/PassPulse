@@ -1,11 +1,11 @@
 # PassPulse — Code Coverage Report (Part-3)
 
-**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)  
-**Testing Period:** 2 November 2026 – 6 November 2026  
-**Document Version:** 1.0  
-**Module Owner & Author:** Saatvik Gupta (PES1UG24CS395) — Authentication, RBAC & Security Middleware Lead  
-**Co-Authors:** Sanchita Sunil, Reet V Porwal, Sambhram M  
-**Repository:** `https://github.com/sanchita-suni/PassPulse`  
+**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)
+**Testing Period:** 2 November 2026 – 6 November 2026
+**Document Version:** 1.0
+**Module Owner & Author:** Saatvik Gupta (PES1UG24CS395) — Authentication, RBAC & Security Middleware Lead
+**Co-Authors:** Sanchita Sunil, Reet V Porwal, Sambhram M
+**Repository:** `https://github.com/sanchita-suni/PassPulse`
 
 ---
 

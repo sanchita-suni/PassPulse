@@ -1,12 +1,12 @@
 # PassPulse — Updated Test Cases Document (Part-3)
 
-**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)  
-**Deliverable:** Mini-Project Deliverables Part-3 — Test Cases Updation  
-**Testing Period:** 2 November 2026 – 6 November 2026  
-**Document Version:** 2.0 (Post-Sprint Updates)  
-**Module Owner & Author:** Saatvik Gupta (PES1UG24CS395) — Authentication, RBAC & Security Middleware Lead  
-**Co-Authors:** Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M  
-**Repository:** `https://github.com/sanchita-suni/PassPulse`  
+**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)
+**Deliverable:** Mini-Project Deliverables Part-3 — Test Cases Updation
+**Testing Period:** 2 November 2026 – 6 November 2026
+**Document Version:** 2.0 (Post-Sprint Updates)
+**Module Owner & Author:** Saatvik Gupta (PES1UG24CS395) — Authentication, RBAC & Security Middleware Lead
+**Co-Authors:** Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M
+**Repository:** `https://github.com/sanchita-suni/PassPulse`
 
 ---
 
@@ -27,7 +27,7 @@ This document updates the baseline Software Test Plan (STP v1.0, recorded in `do
 
 ## 2. Updated Test Case Specifications (Authentication, RBAC & Security)
 
-**Module Owner:** Saatvik Gupta (`PES1UG24CS395`)  
+**Module Owner:** Saatvik Gupta (`PES1UG24CS395`)
 **Test Suite File:** `server/tests/auth.test.js` & `server/tests/admin.test.js`
 
 ### 2.1 Baseline & Expanded Authentication Test Cases (`FR-001`, `FR-002`, `FR-003`)

@@ -31,11 +31,20 @@ function validateCheckInData({
   return { valid: true };
 }
 
+/**
+ * Validates a QR pass and records a check-in.
+ * Guarantees that at most one successful check-in is recorded per ticket,
+ * rejecting duplicate scans and concurrent scans with DUPLICATE_ENTRY.
+ *
+ * Enforces ticket existence in official ticket repository (FR-011 / FR-014).
+ * Derives effective statuses exclusively from official repository records.
+ * Never uses client-supplied status values as authoritative values.
+ */
 function processCheckIn({
   qrData,
   eventId,
-  ticketStatus,
-  bookingConfirmationStatus,
+  ticketStatus: _clientTicketStatus,
+  bookingConfirmationStatus: _clientBookingConfirmationStatus,
 }) {
   const qrResult = verifyQrPass(qrData);
   if (!qrResult.valid) return { success: false, reason: qrResult.reason };
@@ -43,13 +52,19 @@ function processCheckIn({
   const { ticketId, eventId: qrEventId, userId } = qrResult.payload;
   if (qrEventId !== eventId) return { success: false, reason: 'WRONG_EVENT' };
 
-  let effectiveTicketStatus = ticketStatus;
-  let effectiveBookingStatus = bookingConfirmationStatus;
-  const existingTicket = getTicketById(ticketId);
-  if (existingTicket) {
-    effectiveTicketStatus = existingTicket.ticketStatus || effectiveTicketStatus;
-    effectiveBookingStatus = existingTicket.bookingConfirmationStatus || effectiveBookingStatus;
+  // Enforce ticket existence in central repository - reject unrecorded tickets
+  const existingTicket = typeof getTicketById === 'function' ? getTicketById(ticketId) : null;
+  if (!existingTicket) {
+    return {
+      success: false,
+      reason: 'TICKET_NOT_FOUND',
+    };
   }
+
+  // Derive effective statuses EXCLUSIVELY from official repository record
+  // Client-supplied status values are never used as authoritative values
+  const effectiveTicketStatus = existingTicket.ticketStatus;
+  const effectiveBookingStatus = existingTicket.bookingConfirmationStatus;
 
   const validation = validateCheckInData({
     ticketId,
@@ -79,6 +94,8 @@ function processCheckIn({
       checkedInAt: new Date().toISOString(),
     };
     checkInRecords.set(ticketId, checkIn);
+
+    // Sync with central ticket model if present
     if (existingTicket) {
       existingTicket.isCheckedIn = true;
       existingTicket.checkedInAt = checkIn.checkedInAt;

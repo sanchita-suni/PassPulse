@@ -1,11 +1,11 @@
 # PassPulse — System Validation Report (Part-3)
 
-**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)  
-**Evaluation Window:** 2 November 2026 – 6 November 2026  
-**Document Version:** 1.0  
-**Authors:** Saatvik Gupta (Auth & Security Lead), Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M  
-**Baseline Documents:** Software Requirements Specification (SRS v2.1), Software Architecture Design (SAD v1.0), Software Test Plan (STP v1.0)  
-**Repository:** `https://github.com/sanchita-suni/PassPulse`  
+**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)
+**Evaluation Window:** 2 November 2026 – 6 November 2026
+**Document Version:** 1.0
+**Authors:** Saatvik Gupta (Auth & Security Lead), Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M
+**Baseline Documents:** Software Requirements Specification (SRS v2.1), Software Architecture Design (SAD v1.0), Software Test Plan (STP v1.0)
+**Repository:** `https://github.com/sanchita-suni/PassPulse`
 
 ---
 

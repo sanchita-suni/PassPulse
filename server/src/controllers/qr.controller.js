@@ -1,49 +1,92 @@
 const { generateQrPass } = require('../services/qr.service');
+
 const {
   getAttendeePass,
+  getTicketsByUserId,
+  getTicketById,
   getPersistentTicketsByUserId,
 } = require('../services/ticket.service');
+
 const { createToken } = require('../middleware/auth.middleware');
 
 /**
- * Generates an HMAC-signed QR pass from raw parameters (FR-011).
+ * Generates an HMAC-signed QR pass for an existing confirmed ticket (FR-011).
+ * Restricted to authenticated staff/admin roles.
+ * Requires only ticketId from request body.
+ * Enforces ticket existence in repository and confirmed booking status.
+ * Validates that all required trusted ticket fields exist and rejects incomplete ticket records.
+ * Derives payload fields strictly and exclusively from trusted ticket records (no client overrides).
  */
 async function createQrPass(req, res, next) {
   try {
-    const {
-      ticketId,
-      eventId,
-      userId,
-      expiresAt,
-    } = req.body;
+    const { ticketId } = req.body;
 
-    if (!ticketId || !eventId || !userId || !expiresAt) {
+    if (!ticketId) {
       return res.status(400).json({
         status: 'error',
         code: 'INVALID_QR_REQUEST',
-        message:
-          'ticketId, eventId, userId and expiresAt are required',
+        message: 'ticketId is required',
       });
     }
 
-    const expiryTime = new Date(expiresAt).getTime();
+    // Enforce ticket existence in official repository
+    const existingTicket = getTicketById(ticketId);
+    if (!existingTicket) {
+      return res.status(404).json({
+        status: 'error',
+        code: 'TICKET_NOT_FOUND',
+        message: `No ticket found with ID '${ticketId}'`,
+      });
+    }
 
+    // Validate that all required trusted ticket fields exist and reject incomplete ticket records
     if (
-      Number.isNaN(expiryTime) ||
-      expiryTime <= Date.now()
+      !existingTicket.ticketId ||
+      !existingTicket.eventId ||
+      !existingTicket.userId ||
+      !existingTicket.expiresAt
     ) {
       return res.status(400).json({
         status: 'error',
-        code: 'INVALID_EXPIRY',
-        message: 'expiresAt must be a valid future timestamp',
+        code: 'INCOMPLETE_TICKET_RECORD',
+        message: 'Official ticket record is missing required fields (ticketId, eventId, userId, or expiresAt)',
       });
     }
 
+    // Enforce booking confirmation status
+    if (existingTicket.bookingConfirmationStatus !== 'CONFIRMED') {
+      return res.status(400).json({
+        status: 'error',
+        code: 'UNCONFIRMED_BOOKING',
+        message: `QR pass can only be minted for confirmed bookings. Current status: ${existingTicket.bookingConfirmationStatus}`,
+      });
+    }
+
+    // Enforce ticket validity status
+    if (existingTicket.ticketStatus !== 'VALID') {
+      return res.status(400).json({
+        status: 'error',
+        code: 'INVALID_TICKET_STATUS',
+        message: `Ticket is not valid for pass generation. Current status: ${existingTicket.ticketStatus}`,
+      });
+    }
+
+    // Enforce trusted expiration date from official ticket record
+    const ticketExpiryTime = new Date(existingTicket.expiresAt).getTime();
+    if (Number.isNaN(ticketExpiryTime) || ticketExpiryTime <= Date.now()) {
+      return res.status(400).json({
+        status: 'error',
+        code: 'EXPIRED_PASS',
+        message: 'Official ticket record has expired and cannot receive a pass',
+      });
+    }
+
+    // Generate QR pass strictly and exclusively from trusted repository record fields
     const qrPass = await generateQrPass({
-      ticketId,
-      eventId,
-      userId,
-      expiresAt,
+      ticketId: existingTicket.ticketId,
+      eventId: existingTicket.eventId,
+      userId: existingTicket.userId,
+      expiresAt: existingTicket.expiresAt,
     });
 
     return res.status(201).json({
