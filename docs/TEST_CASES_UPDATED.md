@@ -425,11 +425,29 @@ This document updates the baseline Software Test Plan (STP v1.0, recorded in `do
 ---
 ## 3. Summary of Updated Test Suite Execution
 
+### 3.1 Historical Execution Baseline (Pre-Issue #35 / Post-Issue #43)
+
+```
+Test Suites: 22 passed, 22 of 26 total (4 integration suites skipped when TEST_DATABASE_URL is not set)
+Tests:       285 passed, 36 skipped, 321 total (including 25 tests in audit.test.js & audit.service.test.js)
+Statements:  100% in audit.service.js
+Branches:    93.87% in audit.service.js
+Lines:       100% in audit.service.js
+Status:      285 passed, 36 skipped, 0 failures (Previous Execution Baseline)
+```
+
+### 3.2 Latest Execution Summary (Post-Issue #35 Implementation & Hardening)
+
 ```
 Test Suites: 25 passed, 25 of 29 total (4 integration suites skipped when TEST_DATABASE_URL is not set)
-Tests:       346 passed, 36 skipped, 382 total (including 55 tests in health and availability suites)
+Tests:       346 passed, 36 skipped, 382 total (including 61 tests across health and availability suites)
 Statements:  99.09% in health & availability modules (100% in audit.service.js)
 Branches:    85.24% in health & availability modules (93.87% in audit.service.js)
 Lines:       100% in health & availability modules (100% in audit.service.js)
-Status:      100% Passed (Zero Defects)
+Status:      346 passed, 36 skipped, 0 failures (Latest Execution)
 ```
+
+#### Health & Availability Suite Breakdown (61 Tests Total)
+* `src/services/health.service.test.js`: 19 passed
+* `src/services/availability.service.test.js`: 29 passed
+* `tests/health.test.js`: 13 passed
