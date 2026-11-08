@@ -213,6 +213,40 @@ This document updates the baseline Software Test Plan (STP v1.0, recorded in `do
 
 ---
 
+### 2.6 Cryptographic QR Signatures & Verification Test Cases (`SEC-006` / Issue #44)
+
+#### `TC-QR-SIG-01`: Cryptographic QR Pass Generation with HMAC-SHA256
+* **Requirement:** `SEC-006` / `FR-011`
+* **Test Input:** Generate pass for valid ticket; inspect output signature and QR payload.
+* **Expected Result:** Signature is 64 hexadecimal characters computed via HMAC-SHA256 with canonical payload `{ ticketId, eventId, userId, issuedAt, expiresAt }`.
+* **Actual Result:** **PASS** (100% Statements, Branches, Functions, Lines in `qr.service.js`)
+
+#### `TC-QR-SIG-02`: Rejection of Tampered Signed Fields (AC-1)
+* **Requirement:** `SEC-006` (AC-1)
+* **Test Input:** Systematically tamper each signed field individually (`ticketId`, `eventId`, `userId`, `issuedAt`, `expiresAt`, and signature characters) and call `verifyQrPass`.
+* **Expected Result:** Verification returns `{ valid: false, reason: 'INVALID_SIGNATURE' }` for all tampered variants; no bypass permitted.
+* **Actual Result:** **PASS** (6/6 tampering tests passing)
+
+#### `TC-QR-SIG-03`: Safe Handling of Malformed & Non-String Signatures
+* **Requirement:** `SEC-006`
+* **Test Input:** Provide numeric (`12345`), object (`{}`), boolean (`true`), truncated (<64 chars), non-hexadecimal, and empty signatures to `verifyQrPass`.
+* **Expected Result:** Safely rejected with `{ valid: false, reason: 'INVALID_SIGNATURE' }` without throwing unhandled `TypeError` exceptions.
+* **Actual Result:** **PASS** (6/6 edge-case tests passing)
+
+#### `TC-QR-SIG-04`: Constant-Time Signature Comparison
+* **Requirement:** `SEC-006`
+* **Test Input:** Compare provided 32-byte signature buffer against calculated signature buffer using `crypto.timingSafeEqual`.
+* **Expected Result:** Strict constant-time byte comparison preventing timing side-channel attacks.
+* **Actual Result:** **PASS**
+
+#### `TC-QR-SIG-05`: Application Refuses to Start Without Secret (AC-3)
+* **Requirement:** `SEC-006` (AC-3)
+* **Test Input:** Attempt to initialize `qr.service.js` or start application via child process when `QR_HMAC_SECRET` is unset or empty string (`''`).
+* **Expected Result:** Process throws `Error: QR_HMAC_SECRET is not configured` and refuses to start with non-zero exit code.
+* **Actual Result:** **PASS** (Isolated module and child process tests passing)
+
+---
+
 ## 3. Summary of Updated Test Suite Execution
 
 ```

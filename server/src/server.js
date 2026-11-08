@@ -1,3 +1,6 @@
+require('dotenv').config(
+  process.env.DOTENV_CONFIG_PATH ? { path: process.env.DOTENV_CONFIG_PATH } : undefined
+);
 const app = require('./app');
 const { runMigrations } = require('./config/migration-runner');
 const { closePool } = require('./config/db');

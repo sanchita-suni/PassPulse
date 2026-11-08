@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config(
+  process.env.DOTENV_CONFIG_PATH ? { path: process.env.DOTENV_CONFIG_PATH } : undefined
+);
 
 const authRoutes = require('./routes/auth.routes');
 const qrRoutes = require('./routes/qr.routes');

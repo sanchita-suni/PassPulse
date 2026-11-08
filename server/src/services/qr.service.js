@@ -1,14 +1,22 @@
-require('dotenv').config({
-  path: require('path').join(__dirname, '../../.env'),
-});
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 
-const QR_HMAC_SECRET = process.env.QR_HMAC_SECRET;
+const HEX_64_REGEX = /^[0-9a-fA-F]{64}$/;
 
-if (!QR_HMAC_SECRET) {
-  throw new Error('QR_HMAC_SECRET is not configured');
+/**
+ * Retrieves and validates the QR HMAC signing secret from environment variables.
+ * Throws exact error if secret is missing or empty.
+ */
+function getQrSecret() {
+  const secret = process.env.QR_HMAC_SECRET;
+  if (!secret) {
+    throw new Error('QR_HMAC_SECRET is not configured');
+  }
+  return secret;
 }
+
+// Fail-closed validation on module load so importing/starting the service fails immediately if secret is missing
+getQrSecret();
 
 /**
  * Creates a canonical string from the QR payload.
@@ -28,10 +36,11 @@ function serializePayload(payload) {
  * Generates an HMAC-SHA256 signature for a QR payload.
  */
 function generateSignature(payload) {
+  const secret = getQrSecret();
   const serialized = serializePayload(payload);
 
   return crypto
-    .createHmac('sha256', QR_HMAC_SECRET)
+    .createHmac('sha256', secret)
     .update(serialized)
     .digest('hex');
 }
@@ -92,6 +101,13 @@ function verifyQrPass(qrData) {
     };
   }
 
+  if (!parsed || typeof parsed !== 'object') {
+    return {
+      valid: false,
+      reason: 'INVALID_QR_FORMAT',
+    };
+  }
+
   const {
     ticketId,
     eventId,
@@ -107,11 +123,19 @@ function verifyQrPass(qrData) {
     !userId ||
     !issuedAt ||
     !expiresAt ||
-    !signature
+    signature === undefined ||
+    signature === null
   ) {
     return {
       valid: false,
       reason: 'MISSING_QR_FIELDS',
+    };
+  }
+
+  if (typeof signature !== 'string' || !HEX_64_REGEX.test(signature)) {
+    return {
+      valid: false,
+      reason: 'INVALID_SIGNATURE',
     };
   }
 
@@ -157,4 +181,5 @@ module.exports = {
   generateQrPass,
   verifyQrPass,
   generateSignature,
+  getQrSecret,
 };

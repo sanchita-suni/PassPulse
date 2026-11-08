@@ -1,3 +1,6 @@
+process.env.QR_HMAC_SECRET =
+  process.env.QR_HMAC_SECRET || 'test-qr-secret';
+
 const crypto = require('crypto');
 const { generateQrPass } = require('./qr.service');
 const { registerTicket, clearTickets, initializeDefaultTickets } = require('./ticket.service');
