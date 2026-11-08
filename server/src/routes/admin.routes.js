@@ -5,8 +5,11 @@ const { authorize } = require('../middleware/rbac.middleware');
 
 const router = express.Router();
 
-// FR-019: every admin route needs an ADMIN token
+// FR-019, SEC-005: every admin route needs an ADMIN token
 router.use(authenticate, authorize(['ADMIN']));
+
+// Audit log review endpoint (SEC-005 AC-3)
+router.get('/audit-logs', controller.listAuditLogs);
 
 router.get('/events', controller.listEvents);
 router.post('/events/:id/approve', controller.approveEvent);

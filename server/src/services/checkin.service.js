@@ -1,6 +1,7 @@
 const { verifyQrPass } = require('./qr.service');
 const { getTicketById } = require('./ticket.service');
 const { getPool } = require('../config/db');
+const auditService = require('./audit.service');
 
 // Legacy no-database test fixtures use this path; the running API persists check-ins in PostgreSQL.
 const checkInRecords = new Map();
@@ -45,16 +46,41 @@ function processCheckIn({
   eventId,
   ticketStatus: _clientTicketStatus,
   bookingConfirmationStatus: _clientBookingConfirmationStatus,
+  scannedBy,
+  ipAddress,
 }) {
   const qrResult = verifyQrPass(qrData);
-  if (!qrResult.valid) return { success: false, reason: qrResult.reason };
+  const targetTicketId = getTicketIdFromQr(qrData);
+  if (!qrResult.valid) {
+    auditService.recordAudit({
+      actorId: scannedBy,
+      action: 'CHECK_IN_REJECTED',
+      target: targetTicketId,
+      ipAddress,
+    });
+    return { success: false, reason: qrResult.reason };
+  }
 
   const { ticketId, eventId: qrEventId, userId } = qrResult.payload;
-  if (qrEventId !== eventId) return { success: false, reason: 'WRONG_EVENT' };
+  if (qrEventId !== eventId) {
+    auditService.recordAudit({
+      actorId: scannedBy,
+      action: 'CHECK_IN_REJECTED',
+      target: ticketId,
+      ipAddress,
+    });
+    return { success: false, reason: 'WRONG_EVENT' };
+  }
 
   // Enforce ticket existence in central repository - reject unrecorded tickets
   const existingTicket = typeof getTicketById === 'function' ? getTicketById(ticketId) : null;
   if (!existingTicket) {
+    auditService.recordAudit({
+      actorId: scannedBy,
+      action: 'CHECK_IN_REJECTED',
+      target: ticketId,
+      ipAddress,
+    });
     return {
       success: false,
       reason: 'TICKET_NOT_FOUND',
@@ -73,9 +99,23 @@ function processCheckIn({
     ticketStatus: effectiveTicketStatus,
     bookingConfirmationStatus: effectiveBookingStatus,
   });
-  if (!validation.valid) return { success: false, reason: validation.reason };
+  if (!validation.valid) {
+    auditService.recordAudit({
+      actorId: scannedBy,
+      action: 'CHECK_IN_REJECTED',
+      target: ticketId,
+      ipAddress,
+    });
+    return { success: false, reason: validation.reason };
+  }
 
   if (checkInRecords.has(ticketId) || inFlightLocks.has(ticketId)) {
+    auditService.recordAudit({
+      actorId: scannedBy,
+      action: 'CHECK_IN_REJECTED',
+      target: ticketId,
+      ipAddress,
+    });
     return {
       success: false,
       reason: 'DUPLICATE_ENTRY',
@@ -116,15 +156,17 @@ function getTicketIdFromQr(qrData) {
 }
 
 async function writeAuditEvent(client, { actorId, action, target, ipAddress }) {
-  await client.query(
-    `INSERT INTO audit_log (actor_id, action, target, ip_address)
-     VALUES ((SELECT id FROM users WHERE id = $1), $2, $3, $4)`,
-    [actorId || null, action, target || null, ipAddress || null]
-  );
+  await auditService.recordAudit({
+    client,
+    actorId,
+    action,
+    target,
+    ipAddress,
+  });
 }
 
 async function recordRejectedCheckIn({ actorId, ticketId, ipAddress }) {
-  await writeAuditEvent(getPool(), {
+  await auditService.recordAudit({
     actorId,
     action: 'CHECK_IN_REJECTED',
     target: ticketId,

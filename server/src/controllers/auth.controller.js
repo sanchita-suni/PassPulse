@@ -1,6 +1,7 @@
 const UserModel = require('../models/user.model');
 const { hashPassword, comparePassword } = require('../utils/password.util');
 const { generateToken } = require('../utils/jwt.util');
+const auditService = require('../services/audit.service');
 
 const VALID_ROLES = ['ATTENDEE', 'ORGANIZER', 'STAFF', 'ADMIN', 'GATE_STAFF'];
 
@@ -85,8 +86,9 @@ const register = async (req, res) => {
 };
 
 /**
- * User Login (FR-003, SEC-002).
+ * User Login (FR-003, SEC-002, SEC-005).
  * Authenticates against stored bcrypt password hash and returns signed JWT with trusted role.
+ * Audits failed login attempts with sanitized target and IP (SEC-005 AC-1, AC-2).
  */
 const login = async (req, res) => {
   try {
@@ -101,6 +103,12 @@ const login = async (req, res) => {
 
     const user = await UserModel.findByEmail(email);
     if (!user) {
+      await auditService.recordAudit({
+        actorId: null,
+        action: 'LOGIN_FAILED',
+        target: typeof email === 'string' ? email.toLowerCase().trim() : null,
+        ipAddress: req.ip,
+      });
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password credentials',
@@ -109,6 +117,12 @@ const login = async (req, res) => {
 
     const isMatch = await comparePassword(password, user.passwordHash);
     if (!isMatch) {
+      await auditService.recordAudit({
+        actorId: user.id,
+        action: 'LOGIN_FAILED',
+        target: user.email,
+        ipAddress: req.ip,
+      });
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password credentials',
@@ -116,6 +130,12 @@ const login = async (req, res) => {
     }
 
     if (user.isActive === false) {
+      await auditService.recordAudit({
+        actorId: user.id,
+        action: 'LOGIN_FAILED',
+        target: user.email,
+        ipAddress: req.ip,
+      });
       return res.status(401).json({
         status: 'error',
         code: 'ACCOUNT_DEACTIVATED',
@@ -164,8 +184,9 @@ const getProfile = async (req, res) => {
 };
 
 /**
- * Admin-Only User Provisioning Endpoint (SEC-002, CWE-269).
+ * Admin-Only User Provisioning Endpoint (SEC-002, CWE-269, SEC-005).
  * Allows authenticated administrators to provision accounts with privileged roles (GATE_STAFF, STAFF, ORGANIZER, ADMIN).
+ * Audits privileged account provisioning (SEC-005 AC-1).
  */
 const provisionUser = async (req, res) => {
   try {
@@ -216,6 +237,14 @@ const provisionUser = async (req, res) => {
       email,
       passwordHash,
       role: selectedRole,
+    });
+
+    const adminActorId = req.user ? (req.user.id || req.user.userId) : null;
+    await auditService.recordAudit({
+      actorId: adminActorId,
+      action: 'USER_PROVISIONED',
+      target: newUser.id,
+      ipAddress: req.ip,
     });
 
     const { passwordHash: _, ...safeUser } = newUser;

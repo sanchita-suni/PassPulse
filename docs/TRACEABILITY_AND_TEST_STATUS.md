@@ -53,7 +53,7 @@ This matrix establishes bidirectionality between the approved Software Requireme
 | **SEC-002** | Enforce role-based access control (RBAC) on all protected routes | Auth / Saatvik | #40 | `server/src/middleware/rbac.middleware.js`; verified in `tests/auth.test.js` (`TC-SEC-01`, `TC-SEC-02`, `TC-MID-01`) & `tests/admin.test.js`. Issue #40 closed. | **Working / Verified** |
 | **SEC-003** | Prevent SQL injection and cross-site scripting (XSS) vulnerabilities | Auth / Saatvik | #41 | `server/src/config/db.js` parameterized queries; validated in `tests/auth.test.js` (`TC-SEC-04` through `TC-SEC-07`). Issue #41 closed. | **Working / Verified** |
 | **SEC-004** | Configure TLS 1.3 for external communication & HTTP redirect | Security / Sanchita | #42 | `deploy/nginx/proxy.conf`; `scripts/check-tls.sh` 5/5 checks pass (TLS 1.3 accepted, TLS 1.2 rejected, 301 to HTTPS, HSTS, API proxy). Issue #42 closed. | **Working / Verified** |
-| **SEC-005** | Implement security audit logging for failed logins & admin actions | Security / Sambhram | #43 | Audit log schema in `server/db/schema.sql`; verified in `tests/schema.test.js` and admin logs. | **Working / Verified** |
+| **SEC-005** | Implement security audit logging for failed logins & admin actions | Security / Sambhram | #43 | Central audit service (`server/src/services/audit.service.js`); admin endpoint (`GET /api/admin/audit-logs`); schema & immutability trigger in `server/db/schema.sql`. Verified in `src/services/audit.service.test.js` (12 tests, 100% lines), `tests/audit.test.js` (13 tests), and `tests/schema.test.js` (13 tests). Covers failed login auditing (unknown users, wrong passwords, deactivated accounts), rejected scans, administrative actions, and admin review endpoint. Issue #43. | **Working / Verified** |
 | **SEC-006** | Secure QR signatures and cryptographic pass verification | QR / Sambhram | #44 | Deterministic HMAC-SHA256 signing of canonical payload (`ticketId`, `eventId`, `userId`, `issuedAt`, `expiresAt`), constant-time signature verification (`crypto.timingSafeEqual`), strict 64-hex string validation, and fail-closed application startup enforcement when `QR_HMAC_SECRET` is missing/empty. Verified in `server/src/services/qr.service.test.js` (27/27 passed, 100% coverage) & `server/src/routes/qr.routes.test.js` (18/18 passed). | **Working / Verified** |
 | **NFR-001** | Catalog search p95 within 150 ms at 500 concurrent users | Events / Sanchita | #32 | `tests/perf/search.perf.test.js` in CI; `npm run bench:search`; results in `docs/perf/NFR-001_Search_Performance.md`. Issue #32 closed. | **Working / Verified** |
 | **NFR-005** | Home to confirmed booking in 4 screens or fewer | UX / Sanchita | #36 | 4-screen flow with progress bar; `docs/NFR-005_Booking_Journey.md`. | **Implemented / In Review** |
@@ -66,21 +66,23 @@ This matrix establishes bidirectionality between the approved Software Requireme
 ## 3. Current Test Suite Status (Empirically Verified)
 
 ```
-Test Suites: 20 passed, 20 of 24 total (4 PostgreSQL integration suites skipped when TEST_DATABASE_URL is not set)
-Tests:       234 passed, 36 skipped, 270 total
+Test Suites: 22 passed, 22 of 26 total (4 PostgreSQL integration suites skipped when TEST_DATABASE_URL is not set)
+Tests:       285 passed, 36 skipped, 321 total
 Status:      100% pass rate across all unit, integration, and performance suites
 ```
 
 | Suite File | Module Under Test | Test Cases Passed | Status |
 | :--- | :--- | :---: | :---: |
 | `tests/auth.test.js` | Authentication, Privilege Escalation Guard, Admin Provisioning, SQLi/XSS & Middleware | 31 | **PASSED** |
-| `src/routes/qr.routes.test.js` | QR Pass Generation API, Access Guards, Integrity & Token Security | 16 | **PASSED** |
-| `src/services/qr.service.test.js` | QR Cryptographic Signatures | 4 | **PASSED** |
+| `tests/audit.test.js` | Security Audit Logging Integration (AC-1, AC-2, AC-3) | 13 | **PASSED** |
+| `src/services/audit.service.test.js` | Central Audit Service Unit Tests, Persistence & Error Handling | 12 | **PASSED** |
+| `src/routes/qr.routes.test.js` | QR Pass Generation API, Access Guards, Integrity & Token Security | 18 | **PASSED** |
+| `src/services/qr.service.test.js` | QR Cryptographic Signatures (SEC-006) | 27 | **PASSED** |
 | `src/services/ticket.service.test.js` | Ticket Metadata & Formatting | 10 | **PASSED** |
 | `src/services/checkin.service.test.js` | Check-in Validation Logic, Ticket Existence & Concurrency | 12 | **PASSED** |
 | `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Auth | 12 | **PASSED** |
 | `src/routes/checkin.routes.test.js` | Gate Check-in API, Ticket Existence, Duplicate Check & Gate Staff RBAC | 21 | **PASSED** |
-| `tests/schema.test.js` | PostgreSQL Schema Constraints (OPS-001) | 12 | **PASSED** |
+| `tests/schema.test.js` | PostgreSQL Schema Constraints & Audit Log Immutability (OPS-001, SEC-005) | 13 | **PASSED** |
 | `tests/events.test.js` | Catalog Search & Filters (FR-004) | 19 | **PASSED** |
 | `tests/event_management.test.js` | Organizer Event Management (FR-005) | 20 | **PASSED** |
 | `tests/tiers.test.js` | Ticket Tiers (FR-007, BR-001) | 16 | **PASSED** |
@@ -93,7 +95,7 @@ Status:      100% pass rate across all unit, integration, and performance suites
 | `src/config/redis.test.js` | Redis Connection & Configuration | 5 | **PASSED** |
 | `src/middleware/auth.middleware.test.js` | Authentication & RBAC Middleware | 4 | **PASSED** |
 | `src/utils/jwt.util.test.js` | JWT Token Utility | 2 | **PASSED** |
-| **Total** | **All Executed Test Suites** | **234** | **ALL GREEN (100%)** |
+| **Total** | **All Executed Test Suites** | **285** | **ALL GREEN (100%)** |
 
 ---
 
