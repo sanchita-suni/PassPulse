@@ -3,6 +3,8 @@ process.env.QR_HMAC_SECRET =
 process.env.JWT_SECRET =
   process.env.JWT_SECRET || 'test-jwt-secret';
 
+const path = require('path');
+const { spawnSync } = require('child_process');
 const request = require('supertest');
 const app = require('../app');
 const { createToken } = require('../middleware/auth.middleware');
@@ -309,6 +311,46 @@ describe('QR Pass API', () => {
       } finally {
         process.env.NODE_ENV = originalEnv;
       }
+    });
+  });
+
+  describe('Application Startup & Configuration Controls (SEC-006)', () => {
+    test('application refuses to start when QR_HMAC_SECRET is missing', () => {
+      const appPath = path.resolve(__dirname, '../app.js');
+      const envWithoutSecret = { ...process.env, DOTENV_CONFIG_PATH: '.env.nonexistent' };
+      delete envWithoutSecret.QR_HMAC_SECRET;
+
+      const result = spawnSync(
+        process.execPath,
+        ['-e', `require(${JSON.stringify(appPath)})`],
+        {
+          cwd: path.resolve(__dirname, '../..'),
+          env: envWithoutSecret,
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('QR_HMAC_SECRET is not configured');
+    });
+
+    test('application refuses to start when QR_HMAC_SECRET is empty string', () => {
+      const appPath = path.resolve(__dirname, '../app.js');
+      const result = spawnSync(
+        process.execPath,
+        ['-e', `require(${JSON.stringify(appPath)})`],
+        {
+          cwd: path.resolve(__dirname, '../..'),
+          env: {
+            ...process.env,
+            QR_HMAC_SECRET: '',
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('QR_HMAC_SECRET is not configured');
     });
   });
 });
