@@ -42,18 +42,23 @@ async function verifyCheckIn(req, res, next) {
       }
     }
 
+    const scannedBy = req.user && (req.user.userId || req.user.id);
+    const ipAddress = req.ip;
+
     const result = persistentTicket || isPoolInitialized()
       ? await processPersistentCheckIn({
         qrData,
         eventId,
-        scannedBy: req.user && (req.user.userId || req.user.id),
-        ipAddress: req.ip,
+        scannedBy,
+        ipAddress,
       })
       : processCheckIn({
         qrData,
         eventId,
         ticketStatus,
         bookingConfirmationStatus,
+        scannedBy,
+        ipAddress,
       });
 
     if (!result.success) {

@@ -109,6 +109,31 @@ describe('OPS-001 PostgreSQL schema', () => {
     expect(Number(rows[0].n)).toBe(0);
   });
 
+  test('audit_log enforces foreign keys on actor_id and rejects missing action', async () => {
+    // Valid audit insert with existing user
+    await db.query(
+      "INSERT INTO audit_log (actor_id, action, target, ip_address) VALUES ('USR-ORG-1', 'EVENT_APPROVED', 'EVT-1', '127.0.0.1')"
+    );
+
+    // Direct insert with non-existent user violates FK
+    await expectReject(
+      "INSERT INTO audit_log (actor_id, action, target) VALUES ('USR-NONEXISTENT', 'LOGIN_FAILED', 'nobody@x.io')"
+    );
+
+    // Null actor_id is permitted for unauthenticated/anonymous actions
+    await db.query(
+      "INSERT INTO audit_log (actor_id, action, target) VALUES (NULL, 'LOGIN_FAILED', 'nobody@x.io')"
+    );
+
+    // Action cannot be null
+    await expectReject(
+      "INSERT INTO audit_log (actor_id, action) VALUES ('USR-ORG-1', NULL)"
+    );
+
+    const { rows } = await db.query("SELECT COUNT(*)::int AS n FROM audit_log");
+    expect(Number(rows[0].n)).toBe(2);
+  });
+
   test('getPool requires DATABASE_URL when no pool is set', async () => {
     await db.closePool();
     const saved = process.env.DATABASE_URL;

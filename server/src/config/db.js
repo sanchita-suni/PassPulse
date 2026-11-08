@@ -1,5 +1,7 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+require('dotenv').config(
+  process.env.DOTENV_CONFIG_PATH ? { path: process.env.DOTENV_CONFIG_PATH } : undefined
+);
 
 let pool = null;
 

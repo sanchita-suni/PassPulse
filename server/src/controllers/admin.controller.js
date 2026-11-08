@@ -19,15 +19,16 @@ module.exports = {
     const events = await adminService.listEvents(req.query);
     return { total: events.length, events };
   }),
-  approveEvent: handle(async (req) => ({ event: await adminService.approveEvent(req.params.id, req.user) })),
-  rejectEvent: handle(async (req) => ({ event: await adminService.rejectEvent(req.params.id, req.user, reason(req)) })),
-  flagEvent: handle(async (req) => ({ event: await adminService.flagEvent(req.params.id, req.user, reason(req)) })),
-  unflagEvent: handle(async (req) => ({ event: await adminService.unflagEvent(req.params.id, req.user) })),
-  removeEvent: handle(async (req) => ({ event: await adminService.removeEvent(req.params.id, req.user, reason(req)) })),
+  approveEvent: handle(async (req) => ({ event: await adminService.approveEvent(req.params.id, req.user, req.ip) })),
+  rejectEvent: handle(async (req) => ({ event: await adminService.rejectEvent(req.params.id, req.user, reason(req), req.ip) })),
+  flagEvent: handle(async (req) => ({ event: await adminService.flagEvent(req.params.id, req.user, reason(req), req.ip) })),
+  unflagEvent: handle(async (req) => ({ event: await adminService.unflagEvent(req.params.id, req.user, req.ip) })),
+  removeEvent: handle(async (req) => ({ event: await adminService.removeEvent(req.params.id, req.user, reason(req), req.ip) })),
   listUsers: handle(async () => {
     const users = adminService.listUsers();
     return { total: users.length, users };
   }),
-  deactivateUser: handle(async (req) => ({ user: await adminService.setUserActive(req.params.id, req.user, false) })),
-  reactivateUser: handle(async (req) => ({ user: await adminService.setUserActive(req.params.id, req.user, true) })),
+  deactivateUser: handle(async (req) => ({ user: await adminService.setUserActive(req.params.id, req.user, false, req.ip) })),
+  reactivateUser: handle(async (req) => ({ user: await adminService.setUserActive(req.params.id, req.user, true, req.ip) })),
+  listAuditLogs: handle(async (req) => adminService.listAuditLogs(req.query)),
 };
