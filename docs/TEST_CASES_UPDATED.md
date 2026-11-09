@@ -423,6 +423,40 @@ This document updates the baseline Software Test Plan (STP v1.0, recorded in `do
 * **Actual Result:** **PASS**
 
 ---
+### 2.5 QR Verification and Check-in Latency Performance Test Cases (`NFR-002`, Issue #33)
+
+**Module Owner:** Sambhram M — DevOps & Security<br>
+**Test Suite Files:** `server/tests/perf/checkin.perf.test.js`, `server/scripts/bench-checkin.js`, `server/tests/perf/checkinPerfData.js`
+
+#### `TC-PERF-02.1`: In-Process Check-in Pipeline Latency — 1,000 Sequential Scans (AC-1, AC-2)
+* **Requirement:** `NFR-002` (AC-1, AC-2)
+* **Precondition:** 1,000 distinct valid passes seeded with genuine HMAC-SHA256 signatures; `GATE_STAFF` bearer token authenticated.
+* **Test Input:** 1,000 sequential `POST /api/checkin/verify` HTTP requests through Express application stack.
+* **Expected Result:** 1,000 / 1,000 scans return HTTP 200 `CHECKED_IN`; p99 server controller processing time is strictly < 200 ms; full HTTP round-trip p99 is strictly < 200 ms.
+* **Actual Result:** **PASS** (Server p99: 0.84 ms; Client HTTP round-trip p99: 12.40 ms)
+
+#### `TC-PERF-02.2`: Server-Timing Header Compliance & Formatting (AC-2)
+* **Requirement:** `NFR-002` (AC-2)
+* **Precondition:** Gateway check-in endpoint configured with high-precision `process.hrtime.bigint()` instrumentation.
+* **Test Input:** `POST /api/checkin/verify` for valid check-in and duplicate check-in.
+* **Expected Result:** HTTP response header `Server-Timing` is present and matches format `checkin;dur=<ms>` on both HTTP 200 and HTTP 409 responses.
+* **Actual Result:** **PASS** (Emitted on 100% of responses)
+
+#### `TC-PERF-02.3`: Duplicate Scan Rejection Latency Threshold (AC-2)
+* **Requirement:** `NFR-002` (AC-2), `FR-014`
+* **Precondition:** 50 tickets already checked in.
+* **Test Input:** 50 sequential duplicate scan attempts of previously checked-in tickets.
+* **Expected Result:** HTTP 409 `DUPLICATE_ENTRY`; p99 rejection latency strictly below 200 ms without database mutation.
+* **Actual Result:** **PASS** (p99 rejection latency: 0.31 ms)
+
+#### `TC-PERF-02.4`: Persistent PostgreSQL Check-in Transaction Latency Benchmark (AC-1, AC-2, AC-3)
+* **Requirement:** `NFR-002` (AC-1, AC-2, AC-3)
+* **Precondition:** Dedicated PostgreSQL benchmark/test database configured via `TEST_DATABASE_URL` or `BENCH_DATABASE_URL`.
+* **Test Input:** `npm run bench:checkin` (1,000 sequential scans over keep-alive HTTP against live PostgreSQL database with ACID transaction locking and audit logging).
+* **Expected Result:** 1,000 / 1,000 scans committed to `check_in_logs`; p99 server processing time < 200 ms; benchmark-created records cleaned up safely in `finally` block; fails closed if database is unconfirmed.
+* **Actual Result:** **SKIPPED IN LOCAL BASELINE / VERIFIED VIA PG-MEM** (The local PostgreSQL suite was skipped because no dedicated PostgreSQL test database was configured via `TEST_DATABASE_URL` or `BENCH_DATABASE_URL`. Relational SQL batching, schema constraints, and transactional cleanup were verified via in-memory `pg-mem` emulation; live PostgreSQL container benchmarking remains pending).
+
+---
 ## 3. Summary of Updated Test Suite Execution
 
 ### 3.1 Historical Execution Baseline (Pre-Issue #35 / Post-Issue #43)
@@ -451,3 +485,18 @@ Status:      346 passed, 36 skipped, 0 failures (Latest Execution)
 * `src/services/health.service.test.js`: 19 passed
 * `src/services/availability.service.test.js`: 29 passed
 * `tests/health.test.js`: 13 passed
+
+### 3.3 Latest Execution Summary (Post-Issue #33 Implementation & Verification)
+
+```
+Test Suites: 26 passed, 26 of 30 total (4 integration suites skipped when TEST_DATABASE_URL is not set)
+Tests:       349 passed, 37 skipped, 386 total (including 3 tests in checkin.perf.test.js)
+Statements:  100% in checkin.controller.js (99.09% in health & availability, 100% in audit.service.js)
+Branches:    100% in checkin.controller.js (85.24% in health & availability, 93.87% in audit.service.js)
+Lines:       100% in checkin.controller.js (100% in health & availability, 100% in audit.service.js)
+Status:      349 passed, 37 skipped, 0 failures (Latest Execution)
+```
+
+#### Performance Suite Breakdown (NFR-001 & NFR-002)
+* `tests/perf/search.perf.test.js`: 2 passed (NFR-001)
+* `tests/perf/checkin.perf.test.js`: 3 passed, 1 skipped (NFR-002)

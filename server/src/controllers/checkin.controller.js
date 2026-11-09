@@ -6,6 +6,16 @@ const { getPersistentTicketById } = require('../services/ticket.service');
 const { isPoolInitialized } = require('../config/db');
 
 async function verifyCheckIn(req, res, next) {
+  const started = process.hrtime.bigint();
+
+  function sendResponse(status, body) {
+    const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
+    if (typeof res.set === 'function') {
+      res.set('Server-Timing', `checkin;dur=${durationMs.toFixed(2)}`);
+    }
+    return res.status(status).json(body);
+  }
+
   try {
     const {
       qrData,
@@ -20,7 +30,7 @@ async function verifyCheckIn(req, res, next) {
       !ticketStatus ||
       !bookingConfirmationStatus
     ) {
-      return res.status(400).json({
+      return sendResponse(400, {
         status: 'error',
         code: 'INVALID_CHECKIN_REQUEST',
         message:
@@ -75,14 +85,14 @@ async function verifyCheckIn(req, res, next) {
         TICKET_NOT_FOUND: 404,
       };
 
-      return res.status(statusByReason[result.reason] || 400).json({
+      return sendResponse(statusByReason[result.reason] || 400, {
         status: 'error',
         code: result.reason,
         message: 'Check-in rejected',
       });
     }
 
-    return res.status(200).json({
+    return sendResponse(200, {
       status: 'success',
       code: 'CHECKED_IN',
       data: result.checkIn,

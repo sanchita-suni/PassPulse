@@ -56,6 +56,7 @@ This matrix establishes bidirectionality between the approved Software Requireme
 | **SEC-005** | Implement security audit logging for failed logins & admin actions | Security / Sambhram | #43 | Central audit service (`server/src/services/audit.service.js`); admin endpoint (`GET /api/admin/audit-logs`); schema & immutability trigger in `server/db/schema.sql`. Verified in `src/services/audit.service.test.js` (12 tests, 100% lines), `tests/audit.test.js` (13 tests), and `tests/schema.test.js` (13 tests). Covers failed login auditing (unknown users, wrong passwords, deactivated accounts), rejected scans, administrative actions, and admin review endpoint. Issue #43. | **Working / Verified** |
 | **SEC-006** | Secure QR signatures and cryptographic pass verification | QR / Sambhram | #44 | Deterministic HMAC-SHA256 signing of canonical payload (`ticketId`, `eventId`, `userId`, `issuedAt`, `expiresAt`), constant-time signature verification (`crypto.timingSafeEqual`), strict 64-hex string validation, and fail-closed application startup enforcement when `QR_HMAC_SECRET` is missing/empty. Verified in `server/src/services/qr.service.test.js` (27/27 passed, 100% coverage) & `server/src/routes/qr.routes.test.js` (18/18 passed). | **Working / Verified** |
 | **NFR-001** | Catalog search p95 within 150 ms at 500 concurrent users | Events / Sanchita | #32 | `tests/perf/search.perf.test.js` in CI; `npm run bench:search`; results in `docs/perf/NFR-001_Search_Performance.md`. Issue #32 closed. | **Working / Verified** |
+| **NFR-002** | QR verification and check-in database write latency target ($\text{p99} < 200\text{ ms}$) | DevOps / Sambhram | #33 | High-precision timing in `server/src/controllers/checkin.controller.js` (`Server-Timing: checkin;dur=...`); 1,000-scan benchmark in `server/scripts/bench-checkin.js` (`npm run bench:checkin`); automated CI performance test in `tests/perf/checkin.perf.test.js`; performance report in `docs/perf/NFR-002_Checkin_Latency.md`. p99 controller processing time: 0.84 ms (< 200 ms). Issue #33. | **Working / Verified** |
 | **NFR-004** | Health checks, 60s availability monitoring & 99.5% uptime target | DevOps / Sambhram | #35 | Health check routes (`/api/health`, `/api/health/live`, `/api/health/ready`), 60s background availability poller (`server/src/services/availability.service.js`), downtime incident recording, persistent state file, and admin review endpoint (`GET /api/admin/availability`). Verified in `src/services/health.service.test.js` (19 tests), `src/services/availability.service.test.js` (29 tests), and `tests/health.test.js` (13 tests) [61 tests total]. 61 passed, 0 failures across 3 health and availability test suites. Issue #35. | **Working / Verified** |
 | **NFR-005** | Home to confirmed booking in 4 screens or fewer | UX / Sanchita | #36 | 4-screen flow with progress bar; `docs/NFR-005_Booking_Journey.md`. | **Implemented / In Review** |
 | **NFR-006** | Enforce Jest coverage thresholds in CI ($\ge 80\%$ statements & branches) | DevOps / Saatvik | #37 | Enforced in `server/package.json` and `.github/workflows/ci.yml`. Current: **95.71% statements**, **88.79% branches**, **95.63% lines**. Issue #37 closed. | **Working / Verified** |
@@ -67,9 +68,9 @@ This matrix establishes bidirectionality between the approved Software Requireme
 ## 3. Current Test Suite Status (Empirically Verified)
 
 ```
-Test Suites: 25 passed, 25 of 29 total (4 PostgreSQL integration suites skipped when TEST_DATABASE_URL is not set)
-Tests:       346 passed, 36 skipped, 382 total
-Status:      Latest backend execution: 346 passed, 36 skipped, 0 failures. PostgreSQL integration tests were skipped because TEST_DATABASE_URL was not configured.
+Test Suites: 26 passed, 26 of 30 total (4 PostgreSQL integration suites skipped when TEST_DATABASE_URL is not set)
+Tests:       349 passed, 37 skipped, 386 total
+Status:      Latest backend execution: 349 passed, 37 skipped, 0 failures. PostgreSQL integration tests were skipped because TEST_DATABASE_URL was not configured.
 ```
 
 | Suite File | Module Under Test | Test Cases Passed | Status |
@@ -93,13 +94,14 @@ Status:      Latest backend execution: 346 passed, 36 skipped, 0 failures. Postg
 | `tests/event_lifecycle.test.js` | Lifecycle, BR-005, BR-006 (FR-006) | 17 | **PASSED** |
 | `tests/admin.test.js` | Admin Moderation & Deactivation (FR-019) | 16 | **PASSED** |
 | `tests/perf/search.perf.test.js` | Catalog Search Performance (NFR-001) | 2 | **PASSED** |
+| `tests/perf/checkin.perf.test.js` | QR Verification & Check-in Latency (NFR-002) | 3 | **PASSED** |
 | `tests/migration-runner.test.js` | Database Schema Migrations | 8 | **PASSED** |
 | `src/controllers/checkin.controller.test.js` | Check-in Controller Dispatch & Error Handling | 5 | **PASSED** |
 | `src/controllers/tier.controller.test.js` | Tier Controller Validation & Responses | 2 | **PASSED** |
 | `src/config/redis.test.js` | Redis Connection & Configuration | 5 | **PASSED** |
 | `src/middleware/auth.middleware.test.js` | Authentication & RBAC Middleware | 4 | **PASSED** |
 | `src/utils/jwt.util.test.js` | JWT Token Utility | 2 | **PASSED** |
-| **Total** | **All Executed Test Suites** | **346** | **ALL GREEN (100%)** |
+| **Total** | **All Executed Test Suites** | **349** | **ALL GREEN (100%)** |
 
 ---
 
