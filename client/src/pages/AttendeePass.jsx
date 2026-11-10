@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchAttendeePass } from '../services/passApi';
+import { fetchAttendeePass, fetchAttendeeTickets } from '../services/passApi';
 import { loginUser } from '../services/authApi';
 import './AttendeePass.css';
 
@@ -42,13 +42,36 @@ const PRESET_TICKETS = [
   },
 ];
 
-function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenScanner }) {
+function AttendeePass({
+  initialTicketId = 'TKT-CONFIRMED-001',
+  session = null,
+  onSession = null,
+  onBack,
+  onOpenScanner,
+}) {
   const [ticketId, setTicketId] = useState(initialTicketId);
+  const [prevInitialId, setPrevInitialId] = useState(initialTicketId);
+
+  // Sync ticketId state when initialTicketId prop changes from parent
+  if (initialTicketId !== prevInitialId) {
+    setPrevInitialId(initialTicketId);
+    setTicketId(initialTicketId);
+  }
+
   const [customInputId, setCustomInputId] = useState('');
 
   // Genuine Attendee Authentication State (FR-012, SEC-002)
-  const [sessionUser, setSessionUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [localSession, setLocalSession] = useState(null);
+  const sessionUser = session?.user || localSession?.user || null;
+  const token = session?.token || localSession?.token || null;
+
+  // Authenticated attendee's real tickets from backend
+  const [userTickets, setUserTickets] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [, setTicketsError] = useState(null);
+
+  // Test fixtures & preset selector toggle (dev & manual test convenience)
+  const [showTestFixtures, setShowTestFixtures] = useState(false);
 
   // Sign-in form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -67,46 +90,91 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
     setReloadTrigger((v) => v + 1);
   };
 
-  async function handleAttendeeLogin(e) {
-    if (e) e.preventDefault();
-    setLoginError(null);
+  // Pass expiration monitor to invalidate QR dynamically if expiry arrives while page is open
+  const [isPassExpired, setIsPassExpired] = useState(false);
 
-    if (!loginEmail.trim() || !loginPassword) {
-      setLoginError('Please enter both your email address and password.');
-      return;
+  useEffect(() => {
+    if (!pass?.expiresAt) {
+      const timer = setTimeout(() => {
+        setIsPassExpired(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
-    setLoginLoading(true);
+    const expiryTime = new Date(pass.expiresAt).getTime();
+    if (Number.isNaN(expiryTime)) {
+      const timer = setTimeout(() => {
+        setIsPassExpired(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
 
-    try {
-      const data = await loginUser({
-        email: loginEmail.trim(),
-        password: loginPassword,
-      });
+    const remainingMs = expiryTime - Date.now();
+    if (remainingMs <= 0) {
+      const timer = setTimeout(() => {
+        setIsPassExpired(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
 
-      if (!data || !data.token) {
-        throw new Error('Authentication failed: No token received from server.');
+    const timer = setTimeout(() => {
+      setIsPassExpired(true);
+    }, remainingMs);
+
+    return () => clearTimeout(timer);
+  }, [pass?.expiresAt]);
+
+  // Fetch real tickets for authenticated attendee ("for each confirmed ticket")
+  // Only re-fetches when session/token changes or an explicit reload is requested
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadUserTickets() {
+      if (!token) {
+        setUserTickets([]);
+        return;
       }
 
-      setSessionUser(data.user);
-      setToken(data.token);
-      setLoginPassword(''); // Clean up password from memory
-      setLoginError(null);
-    } catch (err) {
-      setLoginError(err.message || 'Authentication failed. Please verify your credentials.');
-    } finally {
-      setLoginLoading(false);
+      setLoadingTickets(true);
+      setTicketsError(null);
+
+      try {
+        const tickets = await fetchAttendeeTickets({ token });
+        if (!isCancelled) {
+          const list = Array.isArray(tickets) ? tickets : [];
+          setUserTickets(list);
+
+          // If current ticketId is unassigned or default placeholder, select first owned ticket
+          if (list.length > 0) {
+            setTicketId((currentId) => {
+              const hasCurrent = list.some((t) => (t.ticketId || t.id) === currentId);
+              if (!hasCurrent && (!currentId || currentId === 'TKT-CONFIRMED-001')) {
+                return list[0].ticketId || list[0].id;
+              }
+              return currentId;
+            });
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setUserTickets([]);
+          setTicketsError(err.message || 'Failed to retrieve tickets');
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoadingTickets(false);
+        }
+      }
     }
-  }
 
-  function handleSignOut() {
-    setSessionUser(null);
-    setToken(null);
-    setPass(null);
-    setError(null);
-  }
+    loadUserTickets();
 
-  // Fetch pass whenever ticketId or token changes
+    return () => {
+      isCancelled = true;
+    };
+  }, [token, reloadTrigger]);
+
+  // Fetch digital pass whenever ticketId or token changes
   useEffect(() => {
     let isCancelled = false;
 
@@ -150,6 +218,52 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
       isCancelled = true;
     };
   }, [ticketId, token, reloadTrigger]);
+
+
+
+  async function handleAttendeeLogin(e) {
+    if (e) e.preventDefault();
+    setLoginError(null);
+
+    if (!loginEmail.trim() || !loginPassword) {
+      setLoginError('Please enter both your email address and password.');
+      return;
+    }
+
+    setLoginLoading(true);
+
+    try {
+      const data = await loginUser({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+
+      if (!data || !data.token) {
+        throw new Error('Authentication failed: No token received from server.');
+      }
+
+      setLocalSession({ user: data.user, token: data.token });
+      if (onSession) {
+        onSession({ user: data.user, token: data.token });
+      }
+      setLoginPassword(''); // Clean up password from memory
+      setLoginError(null);
+    } catch (err) {
+      setLoginError(err.message || 'Authentication failed. Please verify your credentials.');
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  function handleSignOut() {
+    setLocalSession(null);
+    setPass(null);
+    setError(null);
+    setUserTickets([]);
+    if (onSession) {
+      onSession(null);
+    }
+  }
 
   function handleCustomSearch(e) {
     e.preventDefault();
@@ -208,6 +322,13 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
       return isoString;
     }
   }
+
+  // Validate that pass is confirmed, valid, and unexpired before rendering entry QR
+  const isPassValid =
+    Boolean(pass) &&
+    pass.bookingConfirmationStatus === 'CONFIRMED' &&
+    pass.ticketStatus === 'VALID' &&
+    !isPassExpired;
 
   return (
     <main className="pass-page" aria-label="Attendee Digital Pass">
@@ -328,7 +449,7 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
             </button>
           </form>
 
-          {/* Development-Only Email Shortcuts (Completely excluded from production builds) */}
+          {/* Development-Only Email Shortcuts */}
           {import.meta.env.DEV && (
             <div
               style={{
@@ -372,11 +493,13 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
               border: '1px solid rgba(99, 102, 241, 0.25)',
               borderRadius: '8px',
               maxWidth: '680px',
+              width: '100%',
               margin: '0 auto 16px auto',
               fontSize: '13px',
               textAlign: 'left',
               flexWrap: 'wrap',
               gap: '8px',
+              boxSizing: 'border-box',
             }}
           >
             <div>
@@ -414,45 +537,141 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
             </button>
           </div>
 
-          {/* Verification & Test Controls Toolbar */}
-          <section className="pass-toolbar no-print" aria-label="Ticket and User Controls">
-            <div className="toolbar-title">
-              <span>⚙️ Verification & Test Controls</span>
+          {/* Loading Attendee Confirmed Tickets */}
+          {loadingTickets && (
+            <div
+              className="no-print"
+              style={{ textAlign: 'center', margin: '10px 0 16px 0', fontSize: '13px', color: 'var(--text-muted)' }}
+            >
+              Loading your confirmed passes...
             </div>
+          )}
 
-            {/* Preset Ticket Selector */}
-            <div className="toolbar-row">
-              <span className="toolbar-label">Select Ticket:</span>
-              <div className="ticket-pills">
-                {PRESET_TICKETS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`pill-btn ${t.badgeType ? `pill-${t.badgeType}` : ''} ${
-                      ticketId === t.id ? 'active' : ''
-                    }`}
-                    onClick={() => setTicketId(t.id)}
-                  >
-                    {t.label} ({t.id})
-                  </button>
-                ))}
+          {/* Real Confirmed Tickets Selector ("for each confirmed ticket") */}
+          {!loadingTickets && userTickets.length > 0 && (
+            <section
+              className="pass-toolbar no-print"
+              style={{ maxWidth: '680px', width: '100%', margin: '0 auto 20px auto' }}
+              aria-label="Your Confirmed Tickets"
+            >
+              <div className="toolbar-title">
+                <span>🎟️ Your Confirmed Passes ({userTickets.length})</span>
               </div>
-            </div>
+              <div className="toolbar-row">
+                <span className="toolbar-label">Select Ticket:</span>
+                <div className="ticket-pills">
+                  {userTickets.map((t) => {
+                    const id = t.ticketId || t.id;
+                    const isActive = ticketId === id;
+                    const isConfirmed = t.bookingConfirmationStatus === 'CONFIRMED' || t.status === 'CONFIRMED';
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`pill-btn ${isConfirmed ? 'pill-confirmed' : 'pill-warning'} ${
+                          isActive ? 'active' : ''
+                        }`}
+                        onClick={() => setTicketId(id)}
+                        aria-current={isActive ? 'true' : undefined}
+                      >
+                        <strong>{t.eventName || t.ticketTier || 'Ticket'}</strong> — {t.ticketTier || 'Admission'} ({id})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
 
-            {/* Custom Ticket ID Search */}
-            <form className="custom-id-form" onSubmit={handleCustomSearch}>
-              <input
-                type="text"
-                className="custom-id-input"
-                placeholder="Or enter any Ticket ID (e.g. TKT-CONFIRMED-001 or invalid ID)"
-                value={customInputId}
-                onChange={(e) => setCustomInputId(e.target.value)}
-              />
-              <button type="submit" className="custom-id-btn">
-                Load Pass
-              </button>
-            </form>
-          </section>
+          {/* Empty State when attendee has no confirmed tickets */}
+          {!loadingTickets && userTickets.length === 0 && !loading && !pass && !error && (
+            <section
+              className="state-card no-print"
+              style={{ margin: '16px auto 24px auto', maxWidth: '520px', width: '100%' }}
+            >
+              <div style={{ fontSize: '36px' }}>🎟️</div>
+              <h2 className="state-title">No Confirmed Passes Found</h2>
+              <p className="state-message">
+                You do not currently have any confirmed ticket passes associated with your account.
+              </p>
+              {onBack && (
+                <button
+                  type="button"
+                  className="action-btn action-primary"
+                  onClick={onBack}
+                  style={{ marginTop: '8px' }}
+                >
+                  Browse Events & Book Tickets
+                </button>
+              )}
+            </section>
+          )}
+
+          {/* Collapsible Test Fixtures & Presets Toolbar */}
+          <div
+            className="no-print"
+            style={{ maxWidth: '680px', width: '100%', margin: '0 auto 16px auto', boxSizing: 'border-box' }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowTestFixtures((prev) => !prev)}
+              style={{
+                background: 'transparent',
+                border: '1px dashed var(--border)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span>🛠️ Test Fixtures & Custom Ticket Search</span>
+              <span>{showTestFixtures ? '▲ Hide' : '▼ Expand'}</span>
+            </button>
+
+            {showTestFixtures && (
+              <section
+                className="pass-toolbar"
+                style={{ marginTop: '8px', marginBottom: '8px' }}
+                aria-label="Ticket Test Controls"
+              >
+                <div className="toolbar-row">
+                  <span className="toolbar-label">Test Presets:</span>
+                  <div className="ticket-pills">
+                    {PRESET_TICKETS.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={`pill-btn ${t.badgeType ? `pill-${t.badgeType}` : ''} ${
+                          ticketId === t.id ? 'active' : ''
+                        }`}
+                        onClick={() => setTicketId(t.id)}
+                      >
+                        {t.label} ({t.id})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <form className="custom-id-form" onSubmit={handleCustomSearch}>
+                  <input
+                    type="text"
+                    className="custom-id-input"
+                    placeholder="Or enter any Ticket ID (e.g. TKT-CONFIRMED-001 or invalid ID)"
+                    value={customInputId}
+                    onChange={(e) => setCustomInputId(e.target.value)}
+                  />
+                  <button type="submit" className="custom-id-btn">
+                    Load Pass
+                  </button>
+                </form>
+              </section>
+            )}
+          </div>
 
           {/* Loading State */}
           {loading && (
@@ -488,18 +707,32 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
               <span className="state-code">Code: {error.code} (HTTP {error.status})</span>
 
               <div className="state-actions">
-                <button type="button" className="action-btn" onClick={loadPass}>
-                  🔄 Try Again
-                </button>
-                <button
-                  type="button"
-                  className="action-btn action-primary"
-                  onClick={() => {
-                    setTicketId('TKT-CONFIRMED-001');
-                  }}
-                >
-                  Reset to Valid Confirmed Pass
-                </button>
+                {error.status === 401 ? (
+                  <button
+                    type="button"
+                    className="action-btn action-primary"
+                    onClick={handleSignOut}
+                  >
+                    🔑 Sign In Again
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className="action-btn" onClick={loadPass}>
+                      🔄 Try Again
+                    </button>
+                    {userTickets.length > 0 && (
+                      <button
+                        type="button"
+                        className="action-btn action-primary"
+                        onClick={() => {
+                          setTicketId(userTickets[0].ticketId || userTickets[0].id);
+                        }}
+                      >
+                        Load First Confirmed Pass
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </section>
           )}
@@ -537,25 +770,52 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
                   </div>
                 </header>
 
-                {/* Prominent QR Code Section */}
-                <section className="ticket-qr-section" aria-label="Pass QR Code">
-                  <div className="qr-frame">
-                    <img
-                      src={pass.qrCodeDataUrl}
-                      alt={`PassPulse cryptographically signed entry QR code for ticket ${pass.ticketId}`}
-                      className="qr-image"
-                    />
-                  </div>
+                {/* Prominent QR Code Section (Only rendered for confirmed, valid, unexpired passes) */}
+                {isPassValid && pass.qrCodeDataUrl ? (
+                  <section className="ticket-qr-section" aria-label="Pass QR Code">
+                    <div className="qr-frame">
+                      <img
+                        src={pass.qrCodeDataUrl}
+                        alt={`PassPulse cryptographically signed entry QR code for ticket ${pass.ticketId}`}
+                        className="qr-image"
+                      />
+                    </div>
 
-                  <div className="qr-security-badge">
-                    <span>🛡️</span>
-                    <span>HMAC-SHA256 Cryptographically Signed</span>
-                  </div>
+                    <div className="qr-security-badge">
+                      <span>🛡️</span>
+                      <span>HMAC-SHA256 Cryptographically Signed</span>
+                    </div>
 
-                  <p className="qr-instruction">
-                    Present this QR code on your mobile device at venue entrance gates.
-                  </p>
-                </section>
+                    <p className="qr-instruction">
+                      Present this QR code on your mobile device at venue entrance gates.
+                    </p>
+                  </section>
+                ) : (
+                  <section className="ticket-qr-section" aria-label="Pass QR Code Unavailable">
+                    <div
+                      style={{
+                        padding: '24px 16px',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: '12px',
+                        maxWidth: '280px',
+                        margin: '0 auto',
+                      }}
+                    >
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+                      <strong style={{ display: 'block', fontSize: '14px', color: '#ef4444', marginBottom: '4px' }}>
+                        QR Pass Unavailable
+                      </strong>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {pass.bookingConfirmationStatus !== 'CONFIRMED'
+                          ? 'Booking is unconfirmed'
+                          : pass.ticketStatus !== 'VALID'
+                          ? `Ticket status is ${pass.ticketStatus}`
+                          : 'Pass has expired'}
+                      </p>
+                    </div>
+                  </section>
+                )}
 
                 {/* Perforated Ticket Notch Divider */}
                 <div className="ticket-divider" aria-hidden="true">
@@ -608,45 +868,47 @@ function AttendeePass({ initialTicketId = 'TKT-CONFIRMED-001', onBack, onOpenSca
               </article>
 
               {/* Action Buttons Toolbar */}
-              <footer className="ticket-actions no-print">
-                <button
-                  type="button"
-                  className="action-btn action-primary"
-                  onClick={handleDownloadQr}
-                  title="Download QR code image file (PNG)"
-                >
-                  📥 Save QR Image
-                </button>
+              {isPassValid && (
+                <footer className="ticket-actions no-print">
+                  <button
+                    type="button"
+                    className="action-btn action-primary"
+                    onClick={handleDownloadQr}
+                    title="Download QR code image file (PNG)"
+                  >
+                    📥 Save QR Image
+                  </button>
 
-                <button
-                  type="button"
-                  className="action-btn"
-                  onClick={handlePrintPass}
-                  title="Print ticket pass or save as PDF"
-                >
-                  🖨️ Print Pass
-                </button>
-
-                <button
-                  type="button"
-                  className={`action-btn ${copied ? 'copied' : ''}`}
-                  onClick={handleCopyPayload}
-                  title="Copy signed QR payload string to test check-in scanner"
-                >
-                  {copied ? '✓ QR Data Copied!' : '📋 Copy QR Payload'}
-                </button>
-
-                {onOpenScanner && (
                   <button
                     type="button"
                     className="action-btn"
-                    onClick={() => onOpenScanner(pass.eventId)}
-                    title="Switch to Gate Scanner with this event prefilled"
+                    onClick={handlePrintPass}
+                    title="Print ticket pass or save as PDF"
                   >
-                    📱 Test at Gate Scanner
+                    🖨️ Print Pass
                   </button>
-                )}
-              </footer>
+
+                  <button
+                    type="button"
+                    className={`action-btn ${copied ? 'copied' : ''}`}
+                    onClick={handleCopyPayload}
+                    title="Copy signed QR payload string to test check-in scanner"
+                  >
+                    {copied ? '✓ QR Data Copied!' : '📋 Copy QR Payload'}
+                  </button>
+
+                  {onOpenScanner && (
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={() => onOpenScanner(pass.eventId)}
+                      title="Switch to Gate Scanner with this event prefilled"
+                    >
+                      📱 Test at Gate Scanner
+                    </button>
+                  )}
+                </footer>
+              )}
             </div>
           )}
         </>
