@@ -3,6 +3,17 @@ const { getTicketById } = require('./ticket.service');
 const { getPool } = require('../config/db');
 const auditService = require('./audit.service');
 
+function notifyTelemetry(checkIn) {
+  try {
+    const telemetryService = require('./telemetry.service');
+    if (telemetryService && typeof telemetryService.notifyCheckIn === 'function') {
+      telemetryService.notifyCheckIn(checkIn);
+    }
+  } catch {
+    // Telemetry dispatch failure must never abort a confirmed check-in
+  }
+}
+
 // Legacy no-database test fixtures use this path; the running API persists check-ins in PostgreSQL.
 const checkInRecords = new Map();
 const inFlightLocks = new Set();
@@ -140,6 +151,9 @@ function processCheckIn({
       existingTicket.isCheckedIn = true;
       existingTicket.checkedInAt = checkIn.checkedInAt;
     }
+
+    notifyTelemetry(checkIn);
+
     return { success: true, reason: 'CHECKED_IN', checkIn };
   } finally {
     inFlightLocks.delete(ticketId);
@@ -282,6 +296,9 @@ async function processPersistentCheckIn({
 
     await client.query('COMMIT');
     transactionOpen = false;
+
+    notifyTelemetry(checkIn);
+
     return { success: true, reason: 'CHECKED_IN', checkIn };
   } catch (error) {
     if (transactionOpen) await client.query('ROLLBACK');

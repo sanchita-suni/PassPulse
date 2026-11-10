@@ -8,6 +8,7 @@ import {
   cancelEvent,
   changeEventStatus,
 } from '../services/eventsApi'
+import { subscribeToTelemetry, fetchTelemetrySnapshot } from '../services/telemetryApi'
 import { formatDate } from '../utils/format'
 import './EventCatalog.css'
 
@@ -102,6 +103,271 @@ function EventForm({ initial, submitLabel, onSubmit, onCancel }) {
         <button type="button" className="btn" onClick={onCancel}>Close</button>
       </div>
     </form>
+  )
+}
+
+/**
+ * FR-017 / SAD ADR-04: Live Attendance and Scan-Velocity Telemetry Dashboard Panel.
+ */
+function LiveTelemetryPanel({ event, token }) {
+  const [metrics, setMetrics] = useState(null)
+  const [status, setStatus] = useState('connecting')
+  const [error, setError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    if (!event?.id || !token) return
+
+    let isMounted = true
+
+    fetchTelemetrySnapshot(event.id, token)
+      .then((data) => {
+        if (isMounted) setMetrics(data)
+      })
+      .catch((err) => {
+        if (isMounted) setError(err.message)
+      })
+
+    const unsubscribe = subscribeToTelemetry(event.id, token, {
+      onData: (data) => {
+        if (isMounted) {
+          setMetrics(data)
+          setError(null)
+        }
+      },
+      onError: (err) => {
+        if (isMounted) setError(err.message || 'Stream connection issue')
+      },
+      onStatusChange: (newStatus) => {
+        if (isMounted) setStatus(newStatus)
+      },
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [event?.id, token, reloadKey])
+
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'connected':
+        return (
+          <span
+            style={{
+              fontSize: '12px',
+              padding: '3px 10px',
+              borderRadius: '100px',
+              background: '#dcfce7',
+              color: '#15803d',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a' }} />
+            Live (SSE Active)
+          </span>
+        )
+      case 'connecting':
+        return (
+          <span
+            style={{
+              fontSize: '12px',
+              padding: '3px 10px',
+              borderRadius: '100px',
+              background: '#fef3c7',
+              color: '#b45309',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d97706' }} />
+            Connecting...
+          </span>
+        )
+      case 'error':
+        return (
+          <span
+            style={{
+              fontSize: '12px',
+              padding: '3px 10px',
+              borderRadius: '100px',
+              background: '#fee2e2',
+              color: '#b91c1c',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626' }} />
+            Connection Error
+          </span>
+        )
+      default:
+        return (
+          <span
+            style={{
+              fontSize: '12px',
+              padding: '3px 10px',
+              borderRadius: '100px',
+              background: 'var(--border)',
+              color: 'var(--text)',
+              fontWeight: 600,
+            }}
+          >
+            Offline
+          </span>
+        )
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: '16px',
+        padding: '16px',
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        background: 'var(--bg)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <div>
+          <h4 style={{ margin: 0, color: 'var(--text-h)' }}>Live Attendance & Gate Velocity</h4>
+          <span className="muted">Real-time gate telemetry for {event.title} (FR-017)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {getStatusBadge()}
+          {status === 'error' && (
+            <button
+              type="button"
+              className="btn"
+              style={{ padding: '4px 8px', fontSize: '12px' }}
+              onClick={() => {
+                setError(null)
+                setStatus('connecting')
+                setReloadKey((k) => k + 1)
+              }}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && !metrics && (
+        <div className="notice error" style={{ marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+
+      {!metrics && status === 'connecting' ? (
+        <div className="muted" style={{ padding: '16px 0', textAlign: 'center' }}>
+          Connecting to real-time gate telemetry...
+        </div>
+      ) : metrics ? (
+        <div>
+          {metrics.totalAttendees === 0 && (
+            <div className="empty-state" style={{ marginBottom: 16, padding: '16px' }}>
+              No tickets confirmed yet for this event. Gate scans will stream here automatically.
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            {/* Card 1: Attendance Count & Percentage */}
+            <div
+              style={{
+                padding: '14px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'rgba(0,0,0,0.02)',
+              }}
+            >
+              <div className="muted" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Attendance
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-h)', margin: '4px 0' }}>
+                {metrics.checkedInCount}{' '}
+                <span style={{ fontSize: '15px', fontWeight: 400, color: 'var(--text)' }}>
+                  / {metrics.totalAttendees}
+                </span>
+              </div>
+              <div style={{ margin: '8px 0 4px', height: '8px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${Math.min(100, Math.max(0, metrics.attendancePercentage))}%`,
+                    background: 'var(--accent)',
+                    transition: 'width 0.4s ease',
+                  }}
+                />
+              </div>
+              <div className="muted" style={{ fontSize: '12px' }}>
+                {metrics.attendancePercentage}% Checked In
+              </div>
+            </div>
+
+            {/* Card 2: Scan Velocity */}
+            <div
+              style={{
+                padding: '14px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'rgba(0,0,0,0.02)',
+              }}
+            >
+              <div className="muted" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Scan Velocity
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-h)', margin: '4px 0' }}>
+                {metrics.scanVelocity}{' '}
+                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>
+                  scans / min
+                </span>
+              </div>
+              <div className="muted" style={{ fontSize: '12px', marginTop: 8 }}>
+                {metrics.scanVelocity > 0 ? (
+                  <span style={{ color: '#16a34a', fontWeight: 600 }}>🟢 Gate active (rolling 60s)</span>
+                ) : (
+                  <span>⚪ Gate idle (rolling 60s)</span>
+                )}
+              </div>
+            </div>
+
+            {/* Card 3: Gate Status */}
+            <div
+              style={{
+                padding: '14px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'rgba(0,0,0,0.02)',
+              }}
+            >
+              <div className="muted" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Live Stream Info
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-h)', margin: '6px 0 4px' }}>
+                State: <span className="chip" style={{ fontSize: '11px' }}>{event.status}</span>
+              </div>
+              <div className="muted" style={{ fontSize: '12px', marginTop: 12 }}>
+                Updated: {metrics.updatedAt ? new Date(metrics.updatedAt).toLocaleTimeString() : '—'}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -258,11 +524,21 @@ function OrganizerDashboard({ session, onSession }) {
                 >
                   Tiers ({ev.tiers.length})
                 </button>
+                <button
+                  type="button"
+                  className={`btn ${mode?.type === 'telemetry' && mode.id === ev.id ? 'btn-primary' : ''}`}
+                  onClick={() => setMode(mode?.type === 'telemetry' && mode.id === ev.id ? null : { type: 'telemetry', id: ev.id })}
+                >
+                  {mode?.type === 'telemetry' && mode.id === ev.id ? 'Hide Live Stats' : '📊 Live Telemetry'}
+                </button>
                 <button type="button" className="btn" disabled={closed(ev.status)} onClick={() => handleCancel(ev)}>
                   Cancel event
                 </button>
               </div>
             </div>
+            {mode?.type === 'telemetry' && mode.id === ev.id && (
+              <LiveTelemetryPanel event={ev} token={token} />
+            )}
             {mode?.type === 'tiers' && mode.id === ev.id && (
               <TierManager event={ev} token={token} onChanged={load} />
             )}
