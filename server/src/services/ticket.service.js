@@ -173,6 +173,24 @@ function getTicketsByUserId(userId) {
   return results;
 }
 
+/**
+ * Retrieve all confirmed, active tickets for an event ID (in-memory repository).
+ */
+function getConfirmedTicketsByEvent(eventId) {
+  if (!eventId) return [];
+  const results = [];
+  for (const ticket of ticketRecords.values()) {
+    if (
+      ticket.eventId === eventId &&
+      ticket.bookingConfirmationStatus === 'CONFIRMED' &&
+      ticket.ticketStatus !== 'CANCELLED'
+    ) {
+      results.push(ticket);
+    }
+  }
+  return results;
+}
+
 function getOptionalPool() {
   if (!isPoolInitialized()) return null;
   try {
@@ -381,6 +399,7 @@ module.exports = {
   registerTicket,
   getTicketsByUserId,
   getPersistentTicketsByUserId,
+  getConfirmedTicketsByEvent,
   clearTickets,
   initializeDefaultTickets,
   getAttendeePass,
