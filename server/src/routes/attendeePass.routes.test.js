@@ -2,9 +2,10 @@ process.env.QR_HMAC_SECRET = process.env.QR_HMAC_SECRET || 'test-qr-secret';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const app = require('../app');
 const { createToken } = require('../middleware/auth.middleware');
-const { initializeDefaultTickets } = require('../services/ticket.service');
+const { initializeDefaultTickets, registerTicket } = require('../services/ticket.service');
 const { clearCheckInRecords } = require('../services/checkin.service');
 const db = require('../config/db');
 const {
@@ -139,6 +140,36 @@ describe('Attendee Digital Pass API Integration (FR-012)', () => {
     expect(response.body.code).toBe('TICKET_NOT_FOUND');
   });
 
+  test('GET /api/qr/tickets - rejects unauthenticated requests with 401 even if query userId is supplied', async () => {
+    // 1. Without query params
+    const responseWithoutQuery = await request(app)
+      .get('/api/qr/tickets');
+
+    expect(responseWithoutQuery.statusCode).toBe(401);
+    expect(responseWithoutQuery.body.code).toBe('UNAUTHORIZED');
+
+    // 2. Supplying ?userId=<another-user> must not bypass authentication
+    const responseWithQuery = await request(app)
+      .get('/api/qr/tickets?userId=USR-ATTENDEE-001');
+
+    expect(responseWithQuery.statusCode).toBe(401);
+    expect(responseWithQuery.body.code).toBe('UNAUTHORIZED');
+  });
+
+  test('GET /api/qr/tickets - does not allow authenticated attendee to view another user\'s tickets via query param', async () => {
+    const response = await request(app)
+      .get('/api/qr/tickets?userId=USR-ATTENDEE-001')
+      .set('Authorization', `Bearer ${sarahToken}`);
+
+    expect(response.statusCode).toBe(200);
+    const tickets = response.body.data;
+    expect(Array.isArray(tickets)).toBe(true);
+    for (const ticket of tickets) {
+      expect(ticket.userId).toBe('USR-ATTENDEE-002');
+      expect(ticket.userId).not.toBe('USR-ATTENDEE-001');
+    }
+  });
+
   test('GET /api/qr/tickets - returns list of confirmed tickets for attendee', async () => {
     const response = await request(app)
       .get('/api/qr/tickets')
@@ -206,6 +237,106 @@ describe('Attendee Digital Pass API Integration (FR-012)', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body.data.ticketId).toBe('TKT-CONFIRMED-001');
+  });
+
+  test('GET /api/qr/pass/:ticketId - rejects cancelled ticket status with 400', async () => {
+    const response = await request(app)
+      .get('/api/qr/pass/TKT-CANCELLED-001')
+      .set('Authorization', `Bearer ${alexToken}`);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.code).toBe('INVALID_TICKET_STATUS');
+  });
+
+  test('Normalizes authenticated user: handles token with "id" payload format instead of "userId"', async () => {
+    const altToken = jwt.sign(
+      {
+        id: 'USR-ATTENDEE-001',
+        role: 'ATTENDEE',
+        name: 'Alex Johnson',
+        email: 'alex.johnson@example.com',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    // Pass retrieval
+    const passResponse = await request(app)
+      .get('/api/qr/pass/TKT-CONFIRMED-001')
+      .set('Authorization', `Bearer ${altToken}`);
+
+    expect(passResponse.statusCode).toBe(200);
+    expect(passResponse.body.data.ticketId).toBe('TKT-CONFIRMED-001');
+
+    // Ticket list retrieval
+    const ticketsResponse = await request(app)
+      .get('/api/qr/tickets')
+      .set('Authorization', `Bearer ${altToken}`);
+
+    expect(ticketsResponse.statusCode).toBe(200);
+    expect(ticketsResponse.body.data.length).toBeGreaterThan(0);
+    expect(ticketsResponse.body.data[0].userId).toBe('USR-ATTENDEE-001');
+  });
+
+  test('Normalizes authenticated user: rejects unauthorized access when token uses "id" format', async () => {
+    const altSarahToken = jwt.sign(
+      {
+        id: 'USR-ATTENDEE-002',
+        role: 'ATTENDEE',
+        name: 'Sarah Connor',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    const response = await request(app)
+      .get('/api/qr/pass/TKT-CONFIRMED-001')
+      .set('Authorization', `Bearer ${altSarahToken}`);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.body.code).toBe('FORBIDDEN');
+  });
+
+  test('GET /api/qr/tickets & /pass/:ticketId - supports multiple confirmed tickets for the same attendee', async () => {
+    registerTicket({
+      ticketId: 'TKT-CONFIRMED-003',
+      eventId: 'EVT-CULT-2026',
+      eventName: 'PassPulse Cultural Fest 2026',
+      eventCategory: 'Cultural',
+      eventDate: '2026-12-05T17:00:00.000Z',
+      venue: 'Open Air Amphitheatre',
+      userId: 'USR-ATTENDEE-001',
+      attendeeName: 'Alex Johnson',
+      attendeeEmail: 'alex.johnson@example.com',
+      ticketTier: 'General Admission',
+      price: 399.0,
+      bookingConfirmationStatus: 'CONFIRMED',
+      ticketStatus: 'VALID',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      bookingReference: 'BKG-9934-CULT',
+      createdAt: new Date().toISOString(),
+    });
+
+    const listResponse = await request(app)
+      .get('/api/qr/tickets')
+      .set('Authorization', `Bearer ${alexToken}`);
+
+    expect(listResponse.statusCode).toBe(200);
+    const alexTickets = listResponse.body.data;
+    const ticketIds = alexTickets.map((t) => t.ticketId);
+    expect(ticketIds).toContain('TKT-CONFIRMED-001');
+    expect(ticketIds).toContain('TKT-CONFIRMED-003');
+
+    // Fetch pass for the second confirmed ticket
+    const pass2Response = await request(app)
+      .get('/api/qr/pass/TKT-CONFIRMED-003')
+      .set('Authorization', `Bearer ${alexToken}`);
+
+    expect(pass2Response.statusCode).toBe(200);
+    expect(pass2Response.body.data.ticketId).toBe('TKT-CONFIRMED-003');
+    expect(pass2Response.body.data.eventName).toBe('PassPulse Cultural Fest 2026');
+    expect(pass2Response.body.data.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
+    expect(pass2Response.body.data.signature).toHaveLength(64);
   });
 
   test('GET /api/qr/pass/:ticketId - allows ADMIN role to view any attendee pass', async () => {

@@ -345,6 +345,8 @@ function App() {
         {renderNav()}
         <AttendeePass
           initialTicketId={selectedTicketId}
+          session={attendeeSession}
+          onSession={setAttendeeSession}
           onBack={() => navigateTo('home')}
           onOpenScanner={(evtId) => {
             setScannerEventId(evtId || 'EVT-TECH-2026')

@@ -109,6 +109,12 @@
   color: #fff;
 }
 
+.pill-btn.pill-confirmed.active {
+  background: #059669;
+  border-color: #059669;
+  color: #fff;
+}
+
 .pill-btn.pill-danger.active {
   background: #ef4444;
   border-color: #ef4444;
@@ -557,6 +563,72 @@
 
   .action-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .pass-page {
+    padding: 12px 8px 32px;
+  }
+
+  .pass-page-header h1 {
+    font-size: 22px;
+  }
+
+  .pass-page-subtitle {
+    font-size: 13px;
+  }
+
+  .ticket-card {
+    border-radius: 12px;
+  }
+
+  .ticket-header {
+    padding: 14px 12px;
+  }
+
+  .event-title {
+    font-size: 18px;
+  }
+
+  .ticket-qr-section {
+    padding: 16px 12px 14px;
+  }
+
+  .qr-frame {
+    max-width: 190px;
+    max-height: 190px;
+    padding: 10px;
+  }
+
+  .ticket-details {
+    padding: 12px 12px 16px;
+  }
+
+  .detail-label {
+    font-size: 10px;
+  }
+
+  .detail-value {
+    font-size: 13px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .detail-value.mono {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .qr-frame {
+    max-width: 160px;
+    max-height: 160px;
+    padding: 8px;
+  }
+
+  .event-title {
+    font-size: 16px;
   }
 }
 

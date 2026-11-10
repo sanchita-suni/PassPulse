@@ -289,7 +289,8 @@ async function getAttendeePass({ ticketId, requestingUser }) {
 
   // Authorization check: prevent unauthorized access across attendees
   if (requestingUser) {
-    const isOwner = requestingUser.userId === ticket.userId;
+    const requesterId = requestingUser.userId || requestingUser.id;
+    const isOwner = requesterId === ticket.userId;
     const isPrivileged =
       requestingUser.role === 'ADMIN' ||
       requestingUser.role === 'STAFF' ||
