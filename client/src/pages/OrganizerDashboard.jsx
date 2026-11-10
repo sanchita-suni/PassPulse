@@ -9,6 +9,7 @@ import {
   changeEventStatus,
 } from '../services/eventsApi'
 import { subscribeToTelemetry, fetchTelemetrySnapshot } from '../services/telemetryApi'
+import { downloadReport } from '../services/reportsApi'
 import { formatDate } from '../utils/format'
 import './EventCatalog.css'
 
@@ -367,6 +368,103 @@ function LiveTelemetryPanel({ event, token }) {
           </div>
         </div>
       ) : null}
+      <ReportExportSection event={event} token={token} />
+    </div>
+  )
+}
+
+/**
+ * FR-018: Export Attendance and Revenue Reports Component.
+ */
+function ReportExportSection({ event, token }) {
+  const [downloading, setDownloading] = useState(null)
+  const [downloadError, setDownloadError] = useState(null)
+  const [downloadSuccess, setDownloadSuccess] = useState(null)
+
+  const handleDownload = async (reportType, format) => {
+    const key = `${reportType}-${format}`
+    setDownloading(key)
+    setDownloadError(null)
+    setDownloadSuccess(null)
+    try {
+      await downloadReport({ eventId: event.id, reportType, format, token })
+      setDownloadSuccess(`Downloaded ${reportType.toUpperCase()} (${format.toUpperCase()}) successfully!`)
+      setTimeout(() => setDownloadSuccess(null), 4000)
+    } catch (err) {
+      setDownloadError(err.message || 'Download failed')
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: '16px',
+        padding: '14px',
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        background: 'rgba(0,0,0,0.015)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        <div>
+          <strong style={{ fontSize: '13px', color: 'var(--text-h)' }}>📥 Export Official Reports (FR-018)</strong>
+          <div className="muted" style={{ fontSize: '12px' }}>
+            Download verified attendee turnout and financial revenue summaries in CSV or PDF.
+          </div>
+        </div>
+        {downloadSuccess && (
+          <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>
+            ✓ {downloadSuccess}
+          </span>
+        )}
+      </div>
+
+      {downloadError && (
+        <div className="notice error" style={{ marginBottom: 12, fontSize: '12px', padding: '6px 10px' }}>
+          {downloadError}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={Boolean(downloading)}
+          onClick={() => handleDownload('attendance', 'csv')}
+          title="Download attendance list with check-in status in CSV"
+        >
+          {downloading === 'attendance-csv' ? 'Downloading...' : '📄 Attendance CSV'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={Boolean(downloading)}
+          onClick={() => handleDownload('attendance', 'pdf')}
+          title="Download attendance summary report in PDF"
+        >
+          {downloading === 'attendance-pdf' ? 'Downloading...' : '📑 Attendance PDF'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={Boolean(downloading)}
+          onClick={() => handleDownload('revenue', 'csv')}
+          title="Download revenue and confirmed booking records in CSV"
+        >
+          {downloading === 'revenue-csv' ? 'Downloading...' : '💰 Revenue CSV'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={Boolean(downloading)}
+          onClick={() => handleDownload('revenue', 'pdf')}
+          title="Download financial revenue and tier performance summary in PDF"
+        >
+          {downloading === 'revenue-pdf' ? 'Downloading...' : '📈 Revenue PDF'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -529,7 +627,7 @@ function OrganizerDashboard({ session, onSession }) {
                   className={`btn ${mode?.type === 'telemetry' && mode.id === ev.id ? 'btn-primary' : ''}`}
                   onClick={() => setMode(mode?.type === 'telemetry' && mode.id === ev.id ? null : { type: 'telemetry', id: ev.id })}
                 >
-                  {mode?.type === 'telemetry' && mode.id === ev.id ? 'Hide Live Stats' : '📊 Live Telemetry'}
+                  {mode?.type === 'telemetry' && mode.id === ev.id ? 'Hide Telemetry & Reports' : '📊 Telemetry & Reports'}
                 </button>
                 <button type="button" className="btn" disabled={closed(ev.status)} onClick={() => handleCancel(ev)}>
                   Cancel event

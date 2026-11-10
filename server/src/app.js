@@ -12,6 +12,7 @@ const adminRoutes = require('./routes/admin.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const healthRoutes = require('./routes/health.routes');
 const telemetryRoutes = require('./routes/telemetry.routes');
+const reportRoutes = require('./routes/report.routes');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/telemetry', telemetryRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
