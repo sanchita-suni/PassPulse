@@ -39,6 +39,10 @@ Test Suites Passing             : 36 / 36 (100% — 495 Tests)
 ================================================================================
 ```
 
+### Latest Local Full-Suite Result
+
+The later local full-suite run passed **37 suites and 502 tests** and reported **82.19% branch coverage** (alongside 92.46% statement, 97.83% function, and 93.72% line coverage). The 82.17% value above is retained as the historical result for GitHub Actions Run `#42875623511`.
+
 ---
 
 ## 3. Core Subsystem Branch Coverage Breakdown
@@ -96,4 +100,4 @@ All critical authorization, payment/inventory safety, cryptographic verification
 
 ## 6. Conclusion & Sign-Off
 
-With **82.17% aggregate branch coverage (1,351 / 1,644 branches)** verified in GitHub Actions CI Run `#42875623511`—and **96.66%** in `auth.middleware.js`, **100%** in `qr.service.js`, and **100%** in `event_state.service.js`—PassPulse satisfies all Mini-Project Part-3 verification criteria.
+The historical GitHub Actions CI run reported **82.17% aggregate branch coverage (1,351 / 1,644 branches)**. The later local full-suite run reported **82.19%** across 37 suites and 502 tests. Both exceed the 80% NFR-006 branch coverage gate. Per-file figures in this report correspond to the earlier CI coverage data.

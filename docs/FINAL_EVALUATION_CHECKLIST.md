@@ -73,11 +73,11 @@ All three IEEE baseline specifications are consolidated and verified inside [`do
 ## Part-3: Testing & Quality Assurance
 
 - [x] **Original test cases updated to reflect sprint changes** — [`docs/TEST_CASES_UPDATED.md`](TEST_CASES_UPDATED.md) documents post-sprint suites (`TC-SEC-04`–`07`, `TC-MID-01`–`05`, `TC-QR-SIG-01`–`05`, `TC-SEC-AUDIT-01`–`12`, `TC-OPS-01.1`–`13`, `TC-PERF-02.1`–`04`, `booking-hold`, `waitlist`, `telemetry`, `report` exports).
-- [x] **All tests executed according to the Test Plan** — Verified in GitHub Actions CI Run `#42875623511`: **36 / 36 test suites passed, 495 / 495 backend tests passed (0 failed, 0 skipped)**; Frontend **`oxlint` 0 errors**, **`vite build` 65 modules compiled**.
-- [x] **Unit Test Report** — [`docs/UNIT_TEST_REPORT.md`](UNIT_TEST_REPORT.md) (v2.0, all 36 suites itemized).
+- [x] **Automated test suites executed** — Historical GitHub Actions CI Run `#42875623511`: **36 / 36 suites, 495 / 495 backend tests passed**; frontend `oxlint` and Vite build passed. Latest local real-service run: **37 / 37 suites, 502 / 502 backend tests passed (0 failed, 0 skipped)**; coverage and PostgreSQL restart evidence are recorded in the corresponding reports. The manual NFR-005 usability walkthrough remains pending.
+- [x] **Unit Test Report** — [`docs/UNIT_TEST_REPORT.md`](UNIT_TEST_REPORT.md) (v2.0, historical CI suites itemized; latest local results summarized).
 - [x] **System Validation Report** — [`docs/SYSTEM_VALIDATION_REPORT.md`](SYSTEM_VALIDATION_REPORT.md) (v2.0, `FR-001`–`FR-019`, `SEC-001`–`SEC-006`, `NFR-001`–`NFR-007`, `OPS-001`–`002`).
-- [x] **Code Coverage Report** — [`docs/CODE_COVERAGE_REPORT.md`](CODE_COVERAGE_REPORT.md) (v2.0 — **92.42% Statements**, **97.83% Functions**, **93.67% Lines**).
-- [x] **Branch Coverage Report** — [`docs/BRANCH_COVERAGE_REPORT.md`](BRANCH_COVERAGE_REPORT.md) (v2.0 — **82.17% Branches** = `1,351 / 1,644`, passing 80% `NFR-006` gate).
+- [x] **Code Coverage Report** — [`docs/CODE_COVERAGE_REPORT.md`](CODE_COVERAGE_REPORT.md) (historical CI: 92.42% Statements / 82.17% Branches / 93.67% Lines; latest local: 92.46% Statements / 82.19% Branches / 97.83% Functions / 93.72% Lines).
+- [x] **Branch Coverage Report** — [`docs/BRANCH_COVERAGE_REPORT.md`](BRANCH_COVERAGE_REPORT.md) (latest local **82.19% Branches**; historical CI: 82.17%, both above the 80% `NFR-006` gate).
 
 ---
 

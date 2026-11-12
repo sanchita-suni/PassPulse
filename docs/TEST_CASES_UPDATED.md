@@ -534,3 +534,15 @@ CI Status:   ALL GREEN (Backend 36/36 + Frontend oxlint & Vite build)
   * `src/routes/report.routes.test.js`: 24 passed
   * `src/utils/csv.util.test.js`: 13 passed
   * `src/utils/pdf.util.test.js`: 11 passed
+
+### 3.5 Latest Local Real-Service Verification
+
+Executed against PostgreSQL 16 in the dedicated `passpulse_test_db` and Redis logical DB 15; no development database reset, Compose volume deletion, or production secrets were used.
+
+* Full backend suite: 37 suites and 502 tests passed; no failures or skipped tests.
+* Coverage: 92.46% statements, 82.19% branches, 97.83% functions, and 93.72% lines.
+* Real Redis + PostgreSQL tests: 3 passed. They verify the 600-second hold TTL, Redis/DB reconciliation, expiry-worker idempotency and recovery, and a 200-request throughput sample.
+* Throughput: the focused 200-request real-service benchmark measured **323.14 requests/second** (p50 **361.40 ms**, p95 **597.02 ms**), exceeding the 200 requests/second NFR-003 target. The separate one-seat race measures oversell prevention, not throughput.
+* Separate one-seat race: one of 200 requests reserved the seat, 199 returned conflicts, and there were no unexpected errors.
+* NFR-007 restart check: booking, ticket, sold inventory, and audit rows survived an actual PostgreSQL container restart; only the temporary test schema was removed.
+* FR-016 notification behavior remains in-app only under approved deviation DEV-003; no SMTP email delivery was added.

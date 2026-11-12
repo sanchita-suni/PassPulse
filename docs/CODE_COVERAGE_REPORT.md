@@ -40,13 +40,17 @@ Snapshots    : 0 total
 Time         : 39.373 s
 ```
 
-> **Note on Environment Execution:** Locally without PostgreSQL/Redis running (`TEST_DATABASE_URL` / `REDIS_URL` unset), the 4 live PostgreSQL integration suites skip safely. Running in Docker or GitHub Actions CI (`postgres:16-alpine` + `redis:7-alpine`) activates all 36 suites and 495 test cases, yielding the complete 92.42% / 82.17% / 93.67% aggregate metrics above.
+> **Historical CI environment note:** In GitHub Actions Run `#42875623511`, PostgreSQL and Redis services enabled all 36 suites and 495 tests, producing the CI metrics above. In local runs without `TEST_DATABASE_URL` / `REDIS_URL`, live-service integration suites may skip; the latest local Docker-backed results are recorded below.
+
+### Latest Local Full-Suite Coverage
+
+The later local real-service verification reported **37 suites and 502 tests passed**, with **92.46% statements, 82.19% branches, 97.83% functions, and 93.72% lines**. It used PostgreSQL 16 with the dedicated `passpulse_test_db` and Redis logical DB 15. These figures supersede the earlier aggregate for current local verification; the CI values above remain the historical results for Run `#42875623511`.
 
 ---
 
 ## 3. Comprehensive File-by-File Coverage Matrix (Unit & Integration Modules)
 
-The following matrix summarizes verified coverage metrics across all source files on `main` (measured locally across 30+ non-DB suites plus live PostgreSQL CI suites for booking/waitlist persistence):
+The following matrix is the historical file-by-file breakdown from the full CI coverage dataset. The latest local run's aggregate coverage is recorded above; refreshed per-file figures were not available for that run.
 
 | File / Component | % Statements | % Branch | % Functions | % Lines | Notes / Verification Scope | Gate Status |
 | :--- | :---: | :---: | :---: | :---: | :--- | :---: |
@@ -106,4 +110,4 @@ The following matrix summarizes verified coverage metrics across all source file
 
 ## 5. Conclusion
 
-Across all **36 test suites and 495 test cases** running in GitHub Actions CI (`run #42875623511`), PassPulse achieves **92.42% statement coverage**, **82.17% branch coverage**, **97.83% function coverage**, and **93.67% line coverage**—comfortably surpassing the mandatory 80% NFR-006 quality gate.
+The historical GitHub Actions CI run (`#42875623511`) reported 92.42% statement, 82.17% branch, 97.83% function, and 93.67% line coverage across 36 suites and 495 tests. The later local full-suite run reported **92.46% statement, 82.19% branch, 97.83% function, and 93.72% line coverage** across 37 suites and 502 tests. Both exceed the mandatory 80% NFR-006 statement and branch coverage gates.

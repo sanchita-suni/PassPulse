@@ -85,6 +85,20 @@ All **36 backend unit, integration, PostgreSQL transactional, and performance te
 
 ---
 
+## 3.1 Latest Local Real-Service Verification
+
+The later local verification used PostgreSQL 16 with the dedicated `passpulse_test_db` and Redis 7 logical DB 15. It did not use the development database or delete/reset Compose volumes. The earlier GitHub Actions run above remains the historical CI baseline; these local results are a separate execution.
+
+| Metric | Latest Result |
+| :--- | :--- |
+| Backend Jest suites / tests | 37 suites, 502 passed; 0 failed, 0 skipped |
+| Coverage | 92.46% statements, 82.19% branches, 97.83% functions, 93.72% lines |
+| Real Redis + PostgreSQL integration suite | 3 passed; verifies hold TTL, Redis/DB consistency, expiry worker behavior, and throughput |
+| NFR-003 throughput | 323.14 requests/second across 200 booking requests (p50 361.40 ms, p95 597.02 ms) |
+| NFR-007 restart verification | Booking, ticket, sold inventory, and audit records persisted across an actual PostgreSQL container restart |
+
+---
+
 ## 4. Deep Dive: Authentication, RBAC & Security Test Suites (`tests/auth.test.js`, `auth.middleware.test.js`, `jwt.util.test.js`)
 
 **Module Owner:** Saatvik Gupta (`PES1UG24CS395`)  
@@ -109,4 +123,4 @@ All **36 backend unit, integration, PostgreSQL transactional, and performance te
 
 ## 5. Conclusion & Final Sign-Off
 
-The automated PassPulse verification suite passes **495 of 495 tests (100%)** across all **36 test suites**, confirming functional completeness, concurrency durability, cryptographic integrity, and security hardening for final submission.
+The historical GitHub Actions run passed **495 of 495 tests** across 36 suites. The later local real-service verification passed **502 of 502 tests** across 37 suites, with the coverage and PostgreSQL persistence results recorded in Section 3.1.
