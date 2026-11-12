@@ -188,7 +188,7 @@ Six 2-week Agile Scrum sprints:
 
 - [`docs/PassPulse_Project_Synopsis.pdf`](docs/PassPulse_Project_Synopsis.pdf) — Phase 1 synopsis
 - [`docs/PassPulse_Deliverable2_Requirements_SRS.pdf`](docs/PassPulse_Deliverable2_Requirements_SRS.pdf) — SRS v2.0, validation specification, and SPMP
-- [`docs/PassPulse_SRS_SAD_STP.pdf`](docs/PassPulse_SRS_SAD_STP.pdf) — Complete IEEE SRS v2.1, SAD v1.0, and STP v1.0 specification (31 pages)
+- [`docs/PassPulse_SRS_SAD_STP.pdf`](docs/PassPulse_SRS_SAD_STP.pdf) — Updated IEEE SRS v2.2, SAD v1.1, and STP v1.1 specification
 - [`docs/FINAL_EVALUATION_CHECKLIST.md`](docs/FINAL_EVALUATION_CHECKLIST.md) — Part 1–4 evaluation checklist mapped to repository artifacts & CI runs
 - [`docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md`](docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md) — Final Demo & Viva FAQs, member contributions, deviations defense, and 2-min demo script
 - [`docs/TRACEABILITY_AND_TEST_STATUS.md`](docs/TRACEABILITY_AND_TEST_STATUS.md) — Master Requirements Traceability & Verification Matrix (`FR-001`–`FR-019`, `SEC-001`–`006`, `NFR-001`–`007`)
@@ -202,5 +202,5 @@ Six 2-week Agile Scrum sprints:
 - [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) — Architectural and requirement deviations register (`DEV-001`–`DEV-008`)
 
 ### Sprint Demo Videos
-- [`docs/demo/PassPulse_Sprint1_Demo.mp4`](docs/demo/PassPulse_Sprint1_Demo.mp4) — Sprint 1 MVP 1-minute working product demo (uploaded)
-- `docs/demo/PassPulse_Sprint2_Demo.mp4` — Sprint 2 final 2-minute demo target path (script in `docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md`)
+- [`docs/demo/PassPulse_Sprint1_Demo.mp4`](docs/demo/PassPulse_Sprint1_Demo.mp4) — Sprint 1 MVP 1-minute working product demo
+- [`docs/demo/PassPulse_Sprint2_Demo.mp4`](docs/demo/PassPulse_Sprint2_Demo.mp4) — Sprint 2 final 2-minute demo
