@@ -179,7 +179,8 @@ async function joinWaitlist({ userId, eventId, tierId, quantity }) {
     transactionOpen = true;
     await ensurePersistentReferences(client, { userId, eventId, tierId });
     const tierResult = await client.query(
-      `SELECT tier.id, tier.max_per_order, event.status AS event_status, event.is_flagged
+      `SELECT tier.id, tier.max_per_order, tier.quota, tier.sold, tier.reserved,
+              event.status AS event_status, event.is_flagged
        FROM ticket_tiers AS tier
        JOIN events AS event ON event.id = tier.event_id
        WHERE tier.id = $1 AND tier.event_id = $2
@@ -195,6 +196,9 @@ async function joinWaitlist({ userId, eventId, tierId, quantity }) {
     }
     if (quantity > tier.max_per_order) {
       throw new WaitlistError(400, 'ORDER_LIMIT_EXCEEDED', `Quantity cannot exceed ${tier.max_per_order} for this tier`);
+    }
+    if (Number(tier.quota) - Number(tier.sold) - Number(tier.reserved) > 0) {
+      throw new WaitlistError(409, 'WAITLIST_NOT_REQUIRED', 'Join the waitlist only when this ticket tier is sold out');
     }
 
     const duplicate = await client.query(
