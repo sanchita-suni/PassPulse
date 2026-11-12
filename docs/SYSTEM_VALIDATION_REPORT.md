@@ -1,19 +1,20 @@
-# PassPulse — System Validation Report (Part-3)
+# PassPulse — System Validation Report (Part-3 Final)
 
-**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)
-**Evaluation Window:** 2 November 2026 – 6 November 2026
-**Document Version:** 1.0
-**Authors:** Saatvik Gupta (Auth & Security Lead), Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M
-**Baseline Documents:** Software Requirements Specification (SRS v2.1), Software Architecture Design (SAD v1.0), Software Test Plan (STP v1.0)
-**Repository:** `https://github.com/sanchita-suni/PassPulse`
+**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)  
+**Evaluation Window:** 2 November 2026 – 11 November 2026  
+**Document Version:** 2.0 (Final Submission Baseline)  
+**Authors:** Saatvik Gupta (Auth & Security Lead), Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M  
+**Baseline Documents:** Software Requirements Specification (SRS v2.1), Software Architecture Design (SAD v1.0), Software Test Plan (STP v1.0)  
+**Repository:** `https://github.com/sanchita-suni/PassPulse`  
+**Verified CI Run:** GitHub Actions Run `#42875623511` (Commit `630fc86` on `main`)
 
 ---
 
 ## 1. Scope & Objective
 
-The objective of this System Validation Report is to evaluate and certify the end-to-end functionality, security controls, architectural constraints, and performance baselines of the PassPulse platform against the approved SRS, SAD, and STP documents.
+The objective of this System Validation Report is to evaluate and certify the end-to-end functionality, security controls, architectural constraints, and performance baselines of the PassPulse platform against the approved SRS, SAD, and STP documents ahead of final viva evaluation.
 
-Validation ensures that all committed requirements have been verified via empirical test execution, cryptographic checks, schema integrity assertions, and boundary penetration attempts.
+Validation ensures that all committed requirements have been verified via empirical automated test execution (495/495 passing tests across 36 suites in CI), PostgreSQL ACID transactional locks, Redis TTL hold integration, cryptographic HMAC checks, schema integrity assertions, and boundary penetration attempts.
 
 ---
 
@@ -23,68 +24,59 @@ Validation ensures that all committed requirements have been verified via empiri
 
 | Req ID | Requirement Description | SRS Acceptance Criteria | Verification Method | Status | Evidence & Test Reference |
 | :--- | :--- | :--- | :--- | :---: | :--- |
-| **FR-001** | User Registration | Unique email enforced; passwords hashed; default role assigned. | Automated Integration Test | **VALIDATED** | `TC-AUTH-01`, `TC-AUTH-02`. Duplicate registration returns 409 Conflict. |
-| **FR-002** | Password Hashing | Stored passwords must use bcrypt with $\ge 10$ salt rounds. | Unit Test & Inspection | **VALIDATED** | `TC-AUTH-03`, `TC-SEED-01`. Hash format validated (`$2a$10$...`); plain text never persisted. |
-| **FR-003** | JWT Authentication & RBAC | Stateless JWT issued upon login; protected routes require Bearer token. | Automated API Test | **VALIDATED** | `TC-AUTH-04` to `TC-AUTH-09`, `TC-SEC-01` to `TC-SEC-03`. Enforces 401/403 guards across all endpoints. |
-| **FR-004** | Event Discovery & Filtering | Multi-criteria filtering (category, date, venue, price) returning published events. | Supertest API Suite | **VALIDATED** | `tests/events.test.js` (19 tests). All single and combined filter combinations verified. |
-| **FR-005** | Event Creation & Management | Organizers manage drafts, edit details, and modify venues. | Supertest API Suite | **VALIDATED** | `tests/event_management.test.js` (20 tests). Enforces ownership checks (403 `NOT_EVENT_OWNER`). |
-| **FR-006** | Event Lifecycle State Machine | Formal state transitions (`DRAFT` $\to$ `LIVE` $\to$ `COMPLETED`). | Service & Route Tests | **VALIDATED** | `tests/event_lifecycle.test.js` (16 tests). Enforces BR-005 and BR-006; illegal transitions return 409. |
-| **FR-007** | Ticket Tiers & Quotas | Define tiers (VIP, General) with independent quotas and prices. | Supertest API Suite | **VALIDATED** | `tests/tiers.test.js` (16 tests). Rejects negative pricing, zero quotas, and enforces BR-001 (max 5/order). |
-| **FR-008** | 10-Minute Reservation Hold | Temporary seat reservation with Redis TTL of 600 s. | Architectural Review | **IMPLEMENTED** | Redis service defined in `docker-compose.yml`; hold service integration verified in test suites. |
-| **FR-009** | Hold Expiry Release | Released hold seats immediately returned to inventory. | Service Test | **IMPLEMENTED** | Verified in `ticket.service.test.js` inventory recalculation logic. |
-| **FR-010** | Atomic Booking Confirmation | Concurrency-safe ticket checkout in single transaction. | Service Unit Test | **IMPLEMENTED** | Verified in `ticket.service.test.js` with simulated transactional lock. |
-| **FR-011** | HMAC QR Pass Generation | Generate dynamic QR code signed with HMAC-SHA256 secret. | Cryptographic Test | **VALIDATED** | `qr.service.test.js` & `qr.routes.test.js`. 64-hex signature matches server verification. |
-| **FR-012** | Attendee Digital Pass Screen | Client screen displaying attendee name, tier, and live QR code. | Supertest API Test | **VALIDATED** | `attendeePass.routes.test.js` (12 tests) & `AttendeePass.jsx`. |
-| **FR-013** | Gate Scanner & Verification | Camera scan verification requiring `GATE_STAFF` or `ADMIN` role. | Supertest API Test | **VALIDATED** | `checkin.routes.test.js` (20 tests). 401 for unauthenticated, 403 for attendees. |
-| **FR-014** | Duplicate Entry Protection | First scan marked `CHECKED_IN`; subsequent scans rejected as duplicate. | Concurrency Test | **VALIDATED** | `checkin.service.test.js` & `checkin.routes.test.js`. In-flight lock prevents race conditions (409 Conflict). |
-| **FR-015** | FIFO Waitlist | Queue attendees when tier quota reaches zero. | Module Review | **SCHEDULED** | Redis list structure prepared for high-traffic events. |
-| **FR-016** | Waitlist Claim & Expiry | 15-minute claim window on seat release. | Module Review | **SCHEDULED** | Background worker queue designed. |
-| **FR-017** | Attendance Telemetry Dashboard | Real-time scan rate and attendance percentage display. | Service Test | **VALIDATED** | Verified in telemetry metrics and check-in log queries. |
-| **FR-018** | Attendance & Revenue Reports | Export attendance and revenue summaries. | Service Test | **VALIDATED** | Report query builders verified against SQL schema. |
-| **FR-019** | Admin Moderation & Deactivation | Admin approves/flags/removes events; deactivates accounts. | Supertest API Suite | **VALIDATED** | `tests/admin.test.js` (16 tests). Immediate 401 revocation on next request for deactivated accounts. |
+| **FR-001** | User Registration | Unique email enforced; passwords hashed; default role assigned. | Automated Integration Test | **VALIDATED** | `TC-AUTH-01`, `TC-AUTH-02`. Duplicate registration returns 409 Conflict. Issue #13 closed. |
+| **FR-002** | Password Hashing | Stored passwords must use bcrypt with $\ge 10$ salt rounds. | Unit Test & Inspection | **VALIDATED** | `TC-AUTH-03`, `TC-SEED-01`. Hash format validated (`$2a$10$...`); plain text never persisted. Issue #14 closed. |
+| **FR-003** | JWT Authentication & RBAC | Stateless JWT issued upon login; protected routes require Bearer token. | Automated API Test | **VALIDATED** | `TC-AUTH-04` to `TC-AUTH-09`, `TC-SEC-01` to `TC-SEC-03`. Enforces 401/403 guards across all endpoints. Issue #15 closed. |
+| **FR-004** | Event Discovery & Filtering | Multi-criteria filtering (category, date, venue, price) returning published events. | Supertest API Suite | **VALIDATED** | `tests/events.test.js` (19 tests). All single and combined filter combinations verified. Issue #16 closed. |
+| **FR-005** | Event Creation & Management | Organizers manage drafts, edit details, and modify venues. | Supertest API Suite | **VALIDATED** | `tests/event_management.test.js` (20 tests). Enforces ownership checks (403 `NOT_EVENT_OWNER`). Issue #17 closed. |
+| **FR-006** | Event Lifecycle State Machine | Formal state transitions (`DRAFT` $\to$ `LIVE` $\to$ `COMPLETED`). | Service & Route Tests | **VALIDATED** | `tests/event_lifecycle.test.js` (17 tests). Enforces BR-005 and BR-006; illegal transitions return 409. Issue #18 closed. |
+| **FR-007** | Ticket Tiers & Quotas | Define tiers (VIP, General) with independent quotas and prices. | Supertest API Suite | **VALIDATED** | `tests/tiers.test.js` (16 tests). Rejects negative pricing, zero quotas, and enforces BR-001 (max 5/order). Issue #19 closed. |
+| **FR-008** | 10-Minute Reservation Hold | Temporary seat reservation with Redis/DB hold expiry (`600 s`). | PostgreSQL & Redis Integration | **VALIDATED** | `src/services/booking-hold.postgres.test.js` (24 tests) & `booking-hold.service.js`. Zero overselling under concurrent holds. Issue #20 closed. |
+| **FR-009** | Hold Expiry Release | Released hold seats immediately returned to inventory. | Worker & Postgres Test | **VALIDATED** | `hold-expiry.worker.js` & `booking-hold.postgres.test.js`. Verified automated expiry reclamation. Issue #21 closed. |
+| **FR-010** | Atomic Booking Confirmation | Concurrency-safe ticket checkout in single transaction (`FOR UPDATE`). | Transactional ACID Test | **VALIDATED** | `booking-confirmation.service.js` & `booking-hold.postgres.test.js`. Issue #22 closed. |
+| **FR-011** | HMAC QR Pass Generation | Generate dynamic QR code signed with HMAC-SHA256 secret. | Cryptographic Test | **VALIDATED** | `qr.service.test.js` (27 tests) & `qr.routes.test.js` (18 tests). 64-hex signature verified. Issue #23 closed. |
+| **FR-012** | Attendee Digital Pass Screen | Client screen displaying attendee name, tier, and live QR code. | Supertest + UI Suite | **VALIDATED** | `attendeePass.routes.test.js` (18 tests) & `AttendeePass.jsx`. Issue #24 closed. |
+| **FR-013** | Gate Scanner & Verification | Camera scan verification requiring `GATE_STAFF` or `ADMIN` role. | Supertest API Test | **VALIDATED** | `checkin.routes.test.js` (21 tests). 401 for unauthenticated, 403 for attendees. Issue #25 closed. |
+| **FR-014** | Duplicate Entry Protection | First scan marked `CHECKED_IN`; subsequent scans rejected as duplicate. | Concurrency Test | **VALIDATED** | `checkin.service.test.js` (14 tests) & `checkin.routes.test.js`. In-flight lock + DB constraint prevents race conditions (409 Conflict). Issue #26 closed. |
+| **FR-015** | FIFO Waitlist | Queue attendees when tier quota reaches zero. | PostgreSQL Integration | **VALIDATED** | `src/services/waitlist.postgres.test.js` (5 tests) & migration `0002_fifo_waitlist_claim_allocations.sql`. Issue #27 closed. |
+| **FR-016** | Waitlist Claim & Expiry | 15-minute claim window notification on seat release. | Integration + UI | **VALIDATED** | `waitlist.service.js`, `WaitlistNotifications.jsx` & `waitlist.postgres.test.js`. Issue #28 closed. |
+| **FR-017** | Attendance Telemetry Dashboard | Real-time scan rate and attendance percentage via SSE. | SSE & Service Test | **VALIDATED** | `telemetry.service.test.js` (16 tests) & `telemetry.routes.test.js` (20 tests). Live dashboard `OrganizerDashboard.jsx`. Issue #29 closed. |
+| **FR-018** | Attendance & Revenue Reports | Export attendance and revenue summaries as CSV and PDF. | Export & Format Suite | **VALIDATED** | `report.service.test.js` (19), `report.routes.test.js` (24), `csv.util.test.js` (13), `pdf.util.test.js` (11). Issue #30 closed. |
+| **FR-019** | Admin Moderation & Deactivation | Admin approves/flags/removes events; deactivates accounts. | Supertest API Suite | **VALIDATED** | `tests/admin.test.js` (16 tests). Immediate 401 revocation on next request for deactivated accounts. Issue #31 closed. |
 
 ---
 
-### 2.2 Security & Non-Functional Requirements Validation
+### 2.2 Security, Non-Functional & Operational Requirements Validation
 
 | Req ID | Requirement Description | Target Specification | Validation Outcome | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **SEC-001** | Secure Password Storage | Bcrypt with salt rounds $\ge 10$; zero plaintext passwords in database. | Zero plaintext passwords in memory/logs; verified in `tests/auth.test.js`. | **VALIDATED** |
-| **SEC-002** | Role-Based Access Control | Strict authorization guards on all private endpoints. | 401/403 enforced on all admin, organizer, and gate scanner routes. | **VALIDATED** |
-| **SEC-003** | SQL Injection & XSS Mitigation | Parameterized database queries and input sanitization. | Parameterized queries in `db.js`; SQLi/XSS inputs safely rejected or neutralized (`TC-SEC-04` to `TC-SEC-07`). | **VALIDATED** |
-| **SEC-004** | TLS 1.3 Communication | Enforce TLS 1.3 and reject older TLS versions on external proxy. | Nginx reverse proxy configuration verified with `scripts/check-tls.sh` (5/5 checks pass). | **VALIDATED** |
-| **SEC-005** | Security Audit Logging | Record failed logins and administrative actions. | Audit log schema verified in `schema.test.js`; admin actions logged with actor ID. | **VALIDATED** |
-| **SEC-006** | Cryptographic QR Integrity | Prevent forgery or tampering of pass tokens. | HMAC-SHA256 payload signature (`ticketId`, `eventId`, `userId`, `issuedAt`, `expiresAt`) verified in constant time (`crypto.timingSafeEqual`). Tampered fields, malformed/non-string signatures, or expired passes immediately fail verification with `INVALID_SIGNATURE`. Server refuses to start when `QR_HMAC_SECRET` is missing. | **VALIDATED** |
-| **NFR-001** | Search Latency Performance | p95 latency $\le 150\text{ ms}$ under 500 concurrent requests. | Verified in `tests/perf/search.perf.test.js` (p95: 16.2 ms with user pause). | **VALIDATED** |
-| **NFR-006** | Test Coverage Gate | Statement and branch coverage $\ge 80\%$. | **95.71% Statements**, **88.79% Branches**, **95.63% Lines**. | **VALIDATED** |
-| **OPS-001** | Database Schema Integrity | PostgreSQL schema with constraints and foreign keys. | Verified in `tests/schema.test.js` using in-memory `pg-mem` engine. | **VALIDATED** |
-| **OPS-002** | Containerized Deployment | Production stack deployable via Docker Compose. | Validated in `docker-compose.yml`, `server/Dockerfile`, and `client/Dockerfile`. | **VALIDATED** |
+| **SEC-001** | Secure Password Storage | Bcrypt with salt rounds $\ge 10$; zero plaintext passwords. | Zero plaintext passwords in memory/logs; verified in `tests/auth.test.js`. Issue #39 closed. | **VALIDATED** |
+| **SEC-002** | Role-Based Access Control | Strict authorization guards on all private endpoints. | 401/403 enforced on all admin, organizer, and gate scanner routes. Issue #40 closed. | **VALIDATED** |
+| **SEC-003** | SQL Injection & XSS Mitigation | Parameterized database queries and input sanitization. | Parameterized queries in `db.js`; SQLi/XSS inputs rejected/neutralized (`TC-SEC-04`–`07`); CSV injection escaped in `csv.util.js`. Issue #41 closed. | **VALIDATED** |
+| **SEC-004** | TLS 1.3 Communication | Enforce TLS 1.3 and reject older TLS versions on proxy. | Nginx proxy config verified with `scripts/check-tls.sh` (5/5 checks pass). Issue #42 closed. | **VALIDATED** |
+| **SEC-005** | Security Audit Logging | Record failed logins, rejected scans, and admin actions. | Verified in `audit.service.test.js` (12 tests), `audit.test.js` (13 tests), and DB immutability triggers in `schema.test.js`. Issue #43 closed. | **VALIDATED** |
+| **SEC-006** | Cryptographic QR Integrity | Prevent forgery or tampering of pass tokens. | HMAC-SHA256 verified via `crypto.timingSafeEqual`; server fails closed if `QR_HMAC_SECRET` missing (`qr.service.test.js` 27/27 passed). Issue #44 closed. | **VALIDATED** |
+| **NFR-001** | Search Latency Performance | p95 latency $\le 150\text{ ms}$ under 500 concurrent requests. | Verified in `tests/perf/search.perf.test.js` (p95: 16.2 ms with user pause). Issue #32 closed. | **VALIDATED** |
+| **NFR-002** | Check-in Verification Latency | p99 latency $< 200\text{ ms}$. | Verified in `tests/perf/checkin.perf.test.js` (4 tests) & `bench-checkin.js` (server p99: 0.84 ms, HTTP p99: 12.40 ms). Issue #33 closed. | **VALIDATED** |
+| **NFR-004** | Health & Availability Monitoring | `/api/health`, 60s poller, 99.5% uptime tracking. | Verified across `health.service.test.js` (19), `availability.service.test.js` (29), `health.test.js` (13) [61 tests]. Issue #35 closed. | **VALIDATED** |
+| **NFR-005** | Simplified Booking Journey | Checkout completed in $\le 4$ screens. | 4-screen UI flow documented in `docs/NFR-005_Booking_Journey.md` (5-user usability walkthrough open under #36). | **IMPLEMENTED** |
+| **NFR-006** | Test Coverage Gate | Statement and branch coverage $\ge 80\%$ in CI. | **92.42% Statements**, **82.17% Branches**, **93.67% Lines** across 495 CI tests (Run `#42875623511`). Issue #37 closed. | **VALIDATED** |
+| **NFR-007** | 1-Year Data Retention | Enforce 1-year retention for bookings & audit logs. | Verified via Postgres retention functions & `nfr-007-retention.postgres.test.js`. Issue #38 closed. | **VALIDATED** |
+| **OPS-001** | Database Schema Integrity | PostgreSQL schema & migrations with constraints. | Verified in `schema.test.js` (13), `migration-runner.test.js` (8), `migration-postgres.test.js` (4). Issue #45 closed. | **VALIDATED** |
+| **OPS-002** | Containerized Deployment | Full stack deployable via Docker Compose. | Validated in `docker-compose.yml`, `server/Dockerfile`, and `client/Dockerfile`. Issue #46 closed. | **VALIDATED** |
 
 ---
 
 ## 3. Defect & Issue Resolution Status
 
-During the Sprint 1, Sprint 2, and Part-3 testing activities, all critical and high-priority issues assigned to the module leads were addressed and validated:
-
-* **Issue #13 (FR-001):** User registration with unique email — **CLOSED**
-* **Issue #14 (FR-002):** Bcrypt password hashing — **CLOSED**
-* **Issue #15 (FR-003):** JWT authentication and RBAC — **CLOSED**
-* **Issue #39 (SEC-001):** Secure password storage verification — **CLOSED**
-* **Issue #40 (SEC-002):** Role-based security restrictions — **CLOSED**
-* **Issue #41 (SEC-003):** SQL injection and XSS prevention — **CLOSED** (Validated via `TC-SEC-04` through `TC-SEC-07`)
-* **Issue #42 (SEC-004):** TLS 1.3 reverse proxy configuration — **CLOSED**
-* **Issue #37 (NFR-006):** Jest coverage gate enforcement in CI — **CLOSED**
-* **Issue #31 (FR-019):** Admin event moderation and account deactivation — **CLOSED**
-
-There are currently **zero open Critical or High severity defects** affecting the core system.
+* **42 of 44 repository issues closed** (`FR-001`–`FR-019`, `SEC-001`–`SEC-006`, `NFR-001`–`NFR-004`, `NFR-006`–`NFR-007`, `OPS-001`–`OPS-002`).
+* **Remaining Open Non-Blocking Items:**
+  * `#36` (`NFR-005`): 5-user usability walkthrough confirmation (4-screen UI already implemented and API-integrated).
+  * `#49`: Research/study ticket on Redis ticket-hold architecture (hold implementation merged).
+* There are **zero open Critical or High severity code defects**.
 
 ---
 
-## 4. System Readiness Assessment
+## 4. System Readiness Certification
 
-Based on the empirical evidence gathered during the 2nd–6th November testing window:
-1. **Functional Integrity:** All core workflows (Registration $\to$ Login $\to$ Catalog Discovery $\to$ Tier Selection $\to$ Pass Retrieval $\to$ Gate Check-in) operate reliably with end-to-end data consistency.
-2. **Security Controls:** Privilege escalation attempts (CWE-269), malicious SQL injection payloads, and XSS strings are systematically intercepted without service disruption.
-3. **Quality Gates:** All code quality, statement coverage, and branch coverage thresholds exceed the course project specifications.
-
-**Certification:** The PassPulse platform satisfies the verification and validation criteria established in the Software Test Plan.
+In GitHub Actions CI Run `#42875623511`, **36/36 test suites (495/495 tests)** and **Frontend Lint/Build (65 modules, 0 errors)** executed cleanly with zero regressions. All SRS, SAD, and STP validation criteria are fulfilled for final evaluation and viva demonstration.

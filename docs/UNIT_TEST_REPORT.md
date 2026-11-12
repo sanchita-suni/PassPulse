@@ -1,119 +1,112 @@
-# PassPulse — Unit Test Report (Part-3)
+# PassPulse — Unit Test Report (Part-3 Final)
 
-**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)
-**Testing Period:** 2 November 2026 – 6 November 2026
-**Document Version:** 1.0
-**Module Owner & Author:** Saatvik Gupta (PES1UG24CS395) — Authentication, RBAC & Security Middleware Lead
-**Co-Authors & Contributors:** Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M
-**Repository:** `https://github.com/sanchita-suni/PassPulse`
+**Project Name:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)  
+**Testing Period:** 2 November 2026 – 11 November 2026  
+**Document Version:** 2.0 (Final Submission Baseline)  
+**Module Owner & Author:** Saatvik Gupta (PES1UG24CS395) — Authentication, RBAC & Security Middleware Lead  
+**Co-Authors & Contributors:** Sanchita Sunil (Team Lead), Reet V Porwal, Sambhram M  
+**Repository:** `https://github.com/sanchita-suni/PassPulse`  
+**Verified CI Run:** GitHub Actions Run `#42875623511` (Commit `630fc86` on `main`)
 
 ---
 
 ## 1. Executive Summary
 
-This Unit Test Report documents the comprehensive automated test execution for the PassPulse platform during the Mini-Project Deliverables Part-3 testing phase (2nd November to 6th November 2026). Testing was conducted strictly according to the approved Software Test Plan (STP v1.0).
+This Unit Test Report documents the final automated test execution across the entire PassPulse platform ahead of final submission and viva evaluation. Testing was executed in accordance with the approved Software Test Plan (STP v1.0) inside an isolated PostgreSQL 16 + Redis 7 GitHub Actions CI pipeline as well as local unit runs.
 
-All 14 test suites covering authentication, role-based access control, PostgreSQL schema integrity, event discovery and lifecycle, ticket tier management, cryptographic QR pass signing, digital pass presentation, gate scanning, duplicate-entry protection, and search performance were executed using the Jest testing framework.
+All **36 backend unit, integration, PostgreSQL transactional, and performance test suites (495 individual test cases)** achieved a **100% pass rate**, alongside passing frontend static analysis (`oxlint`) and production bundling (`vite build`).
 
-### Summary Metrics
+### Summary Metrics (GitHub Actions CI Run `#42875623511`)
 | Metric | Result | Benchmark / Requirement | Status |
 | :--- | :---: | :---: | :---: |
-| **Total Test Suites** | **14** | 14 configured | **100% Passed** |
-| **Total Test Cases** | **195** | $\ge 150$ | **100% Passed (195/195)** |
+| **Total Backend Test Suites** | **36** | All configured suites | **100% Passed (36/36)** |
+| **Total Backend Test Cases** | **495** | $\ge 150$ | **100% Passed (495/495)** |
 | **Failed Tests** | **0** | 0 | **Zero Defects** |
-| **Skipped Tests** | **0** | 0 | **Complete Run** |
-| **Execution Duration** | **19.727 s** | $< 60\text{ s}$ in CI | **Optimal** |
+| **Skipped Tests (CI with PG+Redis)** | **0** | 0 in CI | **Complete Execution** |
+| **Frontend Lint (`oxlint`)** | **0 Errors** | 0 errors | **PASSED** |
+| **Frontend Build (`vite build`)** | **65 Modules** | Clean bundle (`161 ms`) | **PASSED** |
+| **Backend CI Execution Time** | **39.373 s** | $< 120\text{ s}$ | **Optimal** |
 | **Pass Rate** | **100.0%** | $100\%$ required for freeze | **PASS** |
 
 ---
 
 ## 2. Test Execution Environment & Configuration
 
-* **Runtime:** Node.js v25.1.0 (x64)
+* **CI Environment:** Ubuntu 26.04 runner, Node.js, PostgreSQL `16-alpine` service container, Redis `7-alpine` service container
 * **Test Runner:** Jest v29.7.0 with Supertest v7.0.0
-* **In-Memory Database Mock:** `pg-mem` v3.0.14 for zero-dependency PostgreSQL schema testing
-* **Cryptographic & Auth Libs:** `bcryptjs` v2.4.3 (10 salt rounds), `jsonwebtoken` v9.0.2 (HS256)
-* **Environment Configuration:**
-  * `NODE_ENV`: `test`
-  * `JWT_SECRET`: Mock cryptographic key for signature validation
-  * `QR_HMAC_SECRET`: Mock 256-bit secret for HMAC-SHA256 signature generation
+* **In-Memory Database Engine:** `pg-mem` v3.0.14 for zero-dependency schema constraint verification
+* **Cryptographic & Auth Libraries:** `bcryptjs` v2.4.3 (10 salt rounds), `jsonwebtoken` v9.0.2 (HS256), Node native `crypto` (HMAC-SHA256 + `timingSafeEqual`)
+* **Frontend Tooling:** React 19, Vite, `oxlint`
+* **Key Environment Variables in CI:** `NODE_ENV=test`, `DATABASE_URL`, `TEST_DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `QR_HMAC_SECRET`
 
 ---
 
-## 3. Test Suite Breakdown & Execution Results
+## 3. Complete Test Suite Breakdown (All 36 Suites / 495 Tests)
 
-| Suite # | Test Suite File | Component / Module Under Test | Responsible Owner | Tests Passed | Duration | Status |
-| :---: | :--- | :--- | :--- | :---: | :---: | :---: |
-| 1 | `tests/auth.test.js` | User Registration, Bcrypt Hashing, JWT RBAC, Provisioning, SQLi/XSS Guards | Saatvik Gupta | 31 | 5.94 s | **PASSED** |
-| 2 | `tests/admin.test.js` | Admin Moderation, Account Deactivation, Status Transitions | Sanchita Sunil / Saatvik Gupta | 16 | 2.15 s | **PASSED** |
-| 3 | `tests/schema.test.js` | PostgreSQL Tables, Primary/Foreign Keys, Check Constraints | Sanchita Sunil | 10 | 1.84 s | **PASSED** |
-| 4 | `tests/events.test.js` | Public Event Catalog, Filtering (Category, Date, Venue, Price) | Sanchita Sunil | 19 | 1.92 s | **PASSED** |
-| 5 | `tests/event_management.test.js` | Organizer Event Creation, Editing, Ownership Authorization | Sanchita Sunil | 20 | 2.05 s | **PASSED** |
-| 6 | `tests/event_lifecycle.test.js` | State Transitions (`DRAFT` $\to$ `LIVE` $\to$ `COMPLETED`), BR-005/006 | Sanchita Sunil | 16 | 1.89 s | **PASSED** |
-| 7 | `tests/tiers.test.js` | Ticket Tiers, Quotas, Pricing Constraints, Max Tickets Limit | Sanchita Sunil | 16 | 1.94 s | **PASSED** |
-| 8 | `src/routes/qr.routes.test.js` | QR Generation Endpoint, Token Verification, Payload Structure | Sambhram M | 8 | 1.72 s | **PASSED** |
-| 9 | `src/services/qr.service.test.js` | HMAC-SHA256 Cryptographic Signature & Expiry | Sambhram M | 4 | 1.48 s | **PASSED** |
-| 10 | `src/services/ticket.service.test.js` | Ticket Formatting, Storage, and State Retrieval | Reet V Porwal | 10 | 1.62 s | **PASSED** |
-| 11 | `src/routes/attendeePass.routes.test.js` | Digital Pass Screen Presentation API & Bearer Authentication | Sambhram M | 12 | 2.45 s | **PASSED** |
-| 12 | `src/services/checkin.service.test.js` | Atomic Check-In, In-Flight Locks, Concurrent Scan Rejection | Sambhram M | 11 | 6.80 s | **PASSED** |
-| 13 | `src/routes/checkin.routes.test.js` | Gate Scanner API, RBAC Protection (`GATE_STAFF`), Duplicate Check | Sambhram M | 20 | 10.47 s | **PASSED** |
-| 14 | `tests/perf/search.perf.test.js` | Catalog Search p95 Latency & Load Benchmark (NFR-001) | Sanchita Sunil | 2 | 2.10 s | **PASSED** |
-| **Total** | **14 Suites** | **Entire Application Stack** | **PassPulse Team** | **195** | **19.73 s** | **100% PASS** |
+| # | Test Suite File | Component / Module Under Test | Module Owner | Tests | Status |
+| :---: | :--- | :--- | :--- | :---: | :---: |
+| 1 | `tests/auth.test.js` | User Registration, Bcrypt Hashing, JWT RBAC, Provisioning, SQLi/XSS & Edge Cases | Saatvik Gupta | 31 | **PASSED** |
+| 2 | `src/middleware/auth.middleware.test.js` | JWT Verification, Deactivated Account Lockout & `requireAuth` Guards | Saatvik Gupta | 4 | **PASSED** |
+| 3 | `src/utils/jwt.util.test.js` | JWT Signing & Token Verification Utility | Saatvik Gupta | 2 | **PASSED** |
+| 4 | `tests/admin.test.js` | Admin Event Moderation & Account Deactivation (`FR-019`) | Sanchita / Saatvik | 16 | **PASSED** |
+| 5 | `tests/audit.test.js` | Security Audit Logging Integration (`SEC-005`) | Sambhram / Saatvik | 13 | **PASSED** |
+| 6 | `src/services/audit.service.test.js` | Central Audit Logging Service Unit Tests | Sambhram M | 12 | **PASSED** |
+| 7 | `tests/schema.test.js` | PostgreSQL Schema Tables, Keys, Constraints & Immutability (`OPS-001`) | Sanchita Sunil | 13 | **PASSED** |
+| 8 | `tests/migration-runner.test.js` | Database Migration Runner & Tracking (`OPS-001`) | Reet V Porwal | 8 | **PASSED** |
+| 9 | `tests/migration-postgres.test.js` | Live PostgreSQL Migration Execution & Triggers | Reet V Porwal | 4 | **PASSED** |
+| 10 | `tests/nfr-007-retention.postgres.test.js` | 1-Year Audit & Booking Record Retention Enforcement (`NFR-007`) | Reet V Porwal | 1 | **PASSED** |
+| 11 | `tests/events.test.js` | Public Event Catalog Search & Multi-Parameter Filters (`FR-004`) | Sanchita Sunil | 19 | **PASSED** |
+| 12 | `tests/event_management.test.js` | Organizer Event Creation, Editing & Ownership Guards (`FR-005`) | Sanchita Sunil | 20 | **PASSED** |
+| 13 | `tests/event_lifecycle.test.js` | Event State Machine (`DRAFT` $\to$ `LIVE` $\to$ `COMPLETED`, `FR-006`) | Sanchita Sunil | 17 | **PASSED** |
+| 14 | `tests/tiers.test.js` | Ticket Tier Definitions, Quotas & Order Limits (`FR-007`, `BR-001`) | Sanchita Sunil | 16 | **PASSED** |
+| 15 | `src/controllers/tier.controller.test.js` | Tier Controller Validation & HTTP Responses | Sanchita Sunil | 2 | **PASSED** |
+| 16 | `src/config/redis.test.js` | Redis Connection Lifecycle, Failover & Ping Client | Reet V Porwal | 5 | **PASSED** |
+| 17 | `src/services/booking-hold.postgres.test.js` | 10-Min Holds, Expiry Return & Atomic Booking (`FR-008`, `FR-009`, `FR-010`) | Reet V Porwal | 24 | **PASSED** |
+| 18 | `src/services/waitlist.postgres.test.js` | FIFO Waitlist Queue, Claims & Expiry (`FR-015`, `FR-016`) | Reet V Porwal | 5 | **PASSED** |
+| 19 | `src/services/ticket.service.test.js` | Ticket Metadata, Issuance & State Persistence | Reet V Porwal | 10 | **PASSED** |
+| 20 | `src/services/qr.service.test.js` | HMAC-SHA256 Signing, `timingSafeEqual` & Fail-Closed Secret Guard (`FR-011`, `SEC-006`) | Sambhram M | 27 | **PASSED** |
+| 21 | `src/routes/qr.routes.test.js` | QR Pass Generation API, RBAC & Integrity Protection | Sambhram M | 18 | **PASSED** |
+| 22 | `src/routes/attendeePass.routes.test.js` | Digital Pass Presentation Screen API & Bearer Auth (`FR-012`) | Sambhram M | 18 | **PASSED** |
+| 23 | `src/services/checkin.service.test.js` | Atomic Check-In, In-Flight Locks & Duplicate Rejection (`FR-014`) | Sambhram M | 14 | **PASSED** |
+| 24 | `src/controllers/checkin.controller.test.js` | Check-In Controller `Server-Timing` Dispatch & Error Handling | Sambhram M | 5 | **PASSED** |
+| 25 | `src/routes/checkin.routes.test.js` | Gate Scanner API, Duplicate Entry & Gate Staff RBAC (`FR-013`, `FR-014`) | Sambhram M | 21 | **PASSED** |
+| 26 | `src/services/health.service.test.js` | Dependency Probing (Postgres/Redis), Isolation & Sanitization (`NFR-004`) | Sambhram M | 19 | **PASSED** |
+| 27 | `src/services/availability.service.test.js` | 60s Availability Poller, Outage Recording, State Recovery & 99.5% SLA | Sambhram M | 29 | **PASSED** |
+| 28 | `tests/health.test.js` | Health Endpoints (`/api/health`, `/live`, `/ready`, `/admin/availability`) | Sambhram M | 13 | **PASSED** |
+| 29 | `src/services/telemetry.service.test.js` | Real-Time Scan Velocity & Attendance Metrics (`FR-017`) | Sambhram M | 16 | **PASSED** |
+| 30 | `src/routes/telemetry.routes.test.js` | Telemetry SSE Stream & Broadcast Filtering Integration (`FR-017`) | Sambhram M | 20 | **PASSED** |
+| 31 | `src/services/report.service.test.js` | Attendance & Revenue Aggregation Service (`FR-018`) | Sambhram M | 19 | **PASSED** |
+| 32 | `src/routes/report.routes.test.js` | Report Export Endpoints & Download Headers (`FR-018`) | Sambhram M | 24 | **PASSED** |
+| 33 | `src/utils/csv.util.test.js` | CSV Injection Sanitization & Formatting Utility (`FR-018`) | Sambhram M | 13 | **PASSED** |
+| 34 | `src/utils/pdf.util.test.js` | Structured PDF Report Generation Utility (`FR-018`) | Sambhram M | 11 | **PASSED** |
+| 35 | `tests/perf/search.perf.test.js` | Catalog Search Latency Benchmark (`NFR-001`, p95 $\le 150\text{ ms}$) | Sanchita Sunil | 2 | **PASSED** |
+| 36 | `tests/perf/checkin.perf.test.js` | Check-In Pipeline Latency Benchmark (`NFR-002`, p99 $< 200\text{ ms}$) | Sambhram M | 4 | **PASSED** |
+| **Total** | **36 Test Suites** | **Full End-to-End Application Stack** | **PassPulse Team** | **495** | **100% PASS** |
 
 ---
 
-## 4. Deep Dive: Authentication, RBAC & Security Test Suite (`tests/auth.test.js`)
+## 4. Deep Dive: Authentication, RBAC & Security Test Suites (`tests/auth.test.js`, `auth.middleware.test.js`, `jwt.util.test.js`)
 
-**Module Owner:** Saatvik Gupta (`PES1UG24CS395`)
-**Total Tests in Suite:** 31 (All Passed)
+**Module Owner:** Saatvik Gupta (`PES1UG24CS395`)  
+**Total Module Tests:** 37 tests across 3 core auth suites + cross-cutting RBAC verification in `admin.test.js` (16 tests) and `audit.test.js` (13 tests)
 
 ### 4.1 Registration & Hashing (`FR-001`, `FR-002`, `SEC-001`)
-* `TC-AUTH-01`: Verified successful registration of attendee with 201 Created, sanitized user response (omits `passwordHash`), and valid JWT issuance.
-* `TC-AUTH-02`: Verified duplicate email rejection with 409 Conflict.
-* `TC-AUTH-03`: Verified password length requirement ($\ge 6$ characters) rejecting short passwords with 400 Bad Request.
-* `TC-AUTH-SEC-01`: Tested CWE-269 privilege escalation protection. Attempting to pass `role: "ADMIN"` during public registration is strictly overridden to `ATTENDEE`.
-* `TC-AUTH-SEC-02`: Attempting to pass `role: "GATE_STAFF"` during public registration is strictly overridden to `ATTENDEE`.
-* `TC-AUTH-SEC-03`: Verified that a publicly registered user who attempted admin privilege escalation is blocked from admin routes with 403 Forbidden.
+* `TC-AUTH-01`: Attendee registration returns 201 Created, omits `passwordHash`, issues valid JWT.
+* `TC-AUTH-02`: Duplicate email returns 409 Conflict.
+* `TC-AUTH-03`: Passwords under 6 characters rejected with 400 Bad Request.
+* `TC-AUTH-SEC-01` – `03`: CWE-269 privilege escalation guard overrides caller-supplied `ADMIN` or `GATE_STAFF` roles to `ATTENDEE` during public registration.
 
-### 4.2 Login & Authentication (`FR-003`, `SEC-002`)
-* `TC-AUTH-04`: Verified login with valid email and password returns 200 OK and valid JWT token.
-* `TC-AUTH-05`: Verified login rejection with incorrect password returns 401 Unauthorized.
-* `TC-AUTH-08`: Verified gate staff authentication returns valid JWT with role `GATE_STAFF`.
-* `TC-AUTH-09`: Verified login rejection when email does not exist returns 401 with generic message preventing user enumeration.
+### 4.2 Login, Token Verification & RBAC (`FR-003`, `SEC-002`)
+* `TC-AUTH-04` – `09`: Valid logins for Attendee, Organizer, and Gate Staff; wrong password / unknown user rejected with 401; generic error prevents email enumeration.
+* `TC-SEC-01` – `03`: RBAC middleware enforces 403 Forbidden for unauthorized roles and 401 Unauthorized for missing or tampered JWT signatures.
+* `TC-PROV-01` – `05`: `/api/auth/provision` allows `ADMIN` to create staff accounts while blocking attendees and unauthenticated callers.
 
-### 4.3 JWT Verification & RBAC Middleware (`FR-003`, `SEC-002`)
-* `TC-AUTH-06`: Verified access to `/api/auth/me` with valid Bearer token returns authenticated user payload.
-* `TC-AUTH-07`: Verified rejection of request without Authorization header with 401 Unauthorized.
-* `TC-SEC-01`: Verified RBAC gate blocks ATTENDEE from `/api/auth/admin-only` with 403 Forbidden.
-* `TC-SEC-02`: Verified RBAC gate permits ADMIN to `/api/auth/admin-only` with 200 OK.
-* `TC-SEC-03`: Verified rejection of tampered JWT signature with 401 Unauthorized.
-
-### 4.4 Admin User Provisioning (`SEC-002`, `CWE-269`)
-* `TC-PROV-01`: Verified unauthenticated request to `/api/auth/provision` returns 401.
-* `TC-PROV-02`: Verified non-admin (attendee) request to provision returns 403 Forbidden.
-* `TC-PROV-03`: Verified authenticated ADMIN can provision new `GATE_STAFF` account with 201 Created.
-* `TC-PROV-04`: Verified provisioning request with invalid role returns 400 Bad Request.
-* `TC-PROV-05`: Verified duplicate email in provisioning returns 409 Conflict.
-
-### 4.5 Seeding Isolation (`SEC-001`, `CWE-1188`)
-* `TC-SEED-01`: Verified test environment does NOT automatically seed default accounts.
-* `TC-SEED-02`: Verified `seedDefaultUsers()` initializes default accounts only in development mode.
-
-### 4.6 SQL Injection & XSS Mitigation (`SEC-003`)
-* `TC-SEC-04`: Verified email regex validator rejects SQL injection payloads (`attacker' OR '1'='1'--@pes.edu`) with 400 Bad Request.
-* `TC-SEC-05`: Verified login endpoint safely rejects SQL injection payload (`' OR 1=1 --`) without database syntax errors or auth bypass.
-* `TC-SEC-06`: Verified XSS payloads (`<script>alert("XSS")</script>`) in registration are safely handled as string data without execution or corruption.
-* `TC-SEC-07`: Verified user lookup by ID parameterized query safely resists SQL injection (`1'; DROP TABLE users; --`).
-
-### 4.7 Security Middleware Edge Cases (`SEC-002`)
-* `TC-MID-01`: Verified `authorize()` middleware invoked without prior `req.user` returns 401.
-* `TC-MID-02`: Verified `optionalAuth` attaches user when valid token supplied.
-* `TC-MID-03`: Verified `optionalAuth` proceeds silently without user when header absent.
-* `TC-MID-04`: Verified `optionalAuth` ignores invalid token without throwing errors.
-* `TC-MID-05`: Verified `authenticate` returns 401 if token user was deleted from database.
+### 4.3 SQL Injection, XSS & Middleware Edge Cases (`SEC-003`)
+* `TC-SEC-04` – `07`: Email regex rejects SQL injection payloads; login safely rejects SQLi without leaking DB errors; XSS `<script>` payloads in `fullName` handled as harmless literal JSON strings; parameterized lookups prevent SQL destruction.
+* `TC-MID-01` – `05`: Verified `authorize()` unauthenticated guard, `optionalAuth()` valid/missing/invalid paths, and deleted-user token rejection.
 
 ---
 
-## 5. Conclusion & Pass Criteria Sign-Off
+## 5. Conclusion & Final Sign-Off
 
-The PassPulse test suite achieved a **100% pass rate** across all 195 unit and integration test cases. No regressions were introduced during sprint iterations, and all security edge cases have been empirically validated.
+The automated PassPulse verification suite passes **495 of 495 tests (100%)** across all **36 test suites**, confirming functional completeness, concurrency durability, cryptographic integrity, and security hardening for final submission.

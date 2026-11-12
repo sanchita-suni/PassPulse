@@ -2,7 +2,7 @@
 
 **Project:** PassPulse (Event Discovery, High-Concurrency Ticketing & Anti-Fraud Check-in Platform)  
 **Baseline Documents:** SRS v2.1, SAD v1.0, STP v1.0 (`docs/PassPulse_SRS_SAD_STP.pdf`)  
-**Document Status:** Part-3 Testing & Deliverables Baseline (Updated November 2026)
+**Document Status:** Final Submission & Viva Baseline (Updated November 12, 2026 — CI Run `#42875623511`)  
 
 ---
 
@@ -12,8 +12,8 @@ This matrix establishes bidirectionality between the approved Software Requireme
 
 ### Status Definitions
 * **Working / Verified (Green):** Feature code is written, automated test cases exist, and execution has been empirically verified (100% pass rate in automated test suites).
-* **Implemented / In Review (Yellow):** Feature code exists in the repository, passing unit tests, with integration / production hardening in progress.
-* **Not Implemented / Planned (Red):** Feature is scheduled in Sprint 1 or Sprint 2 backlog; code implementation has not yet commenced.
+* **Implemented / In Review (Yellow):** Feature code exists in the repository, passing unit tests, with secondary usability walkthrough or optional verification in progress.
+* **Not Implemented / Planned (Red):** Scheduled in backlog; implementation not yet commenced.
 
 ---
 
@@ -23,25 +23,25 @@ This matrix establishes bidirectionality between the approved Software Requireme
 
 | Req ID | Requirement Summary | Module & Owner | Sprint Story | Component / Source File | Planned Test Cases | Current Status | Empirical Evidence / Test Pass |
 | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
-| **FR-001** | User registration with unique email, bcrypt password, role assignment. | Auth / Saatvik | `STORY-AUTH-01` (S1) | `controllers/auth.controller.js`<br>`models/user.model.js` | `TC-AUTH-01`<br>`TC-AUTH-02` | **Working / Verified** | Verified in `tests/auth.test.js`. Rejects duplicate emails with 409 Conflict. Issue #13 closed. |
+| **FR-001** | User registration with unique email, bcrypt password, role assignment. | Auth / Saatvik | `STORY-AUTH-01` (S1) | `controllers/auth.controller.js`<br>`models/user.model.js` | `TC-AUTH-01`<br>`TC-AUTH-02` | **Working / Verified** | Verified in `tests/auth.test.js` (31 tests). Rejects duplicate emails with 409 Conflict. Issue #13 closed. |
 | **FR-002** | Password hashing via bcrypt with salt rounds $\ge 10$. | Auth / Saatvik | `STORY-AUTH-01` (S1) | `utils/password.util.js` | `TC-AUTH-03` | **Working / Verified** | Verified in `tests/auth.test.js`. Hashes match `$2a$10$...`. Zero plain text in memory. Issue #14 closed. |
-| **FR-003** | JWT Bearer token authentication & role restriction (401/403). | Auth / Saatvik | `STORY-AUTH-02` (S1) | `middleware/auth.middleware.js`<br>`middleware/rbac.middleware.js` | `TC-AUTH-04`<br>`TC-AUTH-05` | **Working / Verified** | Verified in `tests/auth.test.js` & `attendeePass.routes.test.js`. Enforces 401/403 guards. Issue #15 closed. |
-| **FR-004** | Event catalog search & multi-parameter filtering (category, date, venue, price). | Events / Sanchita | `STORY-EVT-01` (S1)<br>`STORY-EVT-02` (S1) | `services/event.service.js`<br>`routes/event.routes.js`<br>`client/src/pages/EventCatalog.jsx` | `TC-EVT-01`<br>`TC-EVT-02` | **Working / Verified** | Verified in `tests/events.test.js` (19 tests): every filter alone and combined, PUBLISHED/LIVE only, empty result returns 200 with "No events found", invalid filters return 400. Issue #16 closed. |
-| **FR-005** | Organizer event creation, editing, scheduling, and draft management. | Events / Sanchita | `STORY-EVT-03` (S2) | `services/event.service.js`<br>`controllers/event.controller.js`<br>`client/src/pages/OrganizerDashboard.jsx` | `TC-EVT-03` | **Working / Verified** | Verified in `tests/event_management.test.js` (20 tests): new events saved as DRAFT, another organizer gets 403 `NOT_EVENT_OWNER`, closed events return 409. Issue #17 closed. |
-| **FR-006** | Formal event lifecycle state machine (`DRAFT` $\to$ `LIVE` $\to$ `COMPLETED`). | Events / Sanchita | `STORY-EVT-03` (S2) | `services/event_state.service.js`<br>`PATCH /api/events/:id/status` | `TC-EVT-04`<br>`TC-EVT-05` | **Working / Verified** | Verified in `tests/event_lifecycle.test.js` (17 tests): illegal moves return 409 `INVALID_TRANSITION`, publishing is admin-only, BR-005 and BR-006 enforced. Issue #18 closed. |
-| **FR-007** | Organizer ticket tier definition (Early Bird, VIP) with independent quotas/prices. | Events / Sanchita | `STORY-BKG-01` (S1) | `services/tier.service.js`<br>`controllers/tier.controller.js`<br>`client/src/components/TierManager.jsx` | `TC-TCK-01` | **Working / Verified** | Verified in `tests/tiers.test.js` (16 tests): zero quota or negative price return 400, total quota within capacity, unique names, BR-001 max 5 per order. Issue #19 closed. |
-| **FR-008** | 10-minute temporary seat reservation hold using Redis key TTL 600 s. | Booking / Reet | `STORY-BKG-02` (S1) | `services/hold.service.js`<br>`routes/booking.routes.js` | `TC-BKG-01` | **Implemented / In Review** | Redis container available in `docker-compose.yml`. Hold service logic verified in test suite. Issue #20. |
-| **FR-009** | Automatic return of held seats to stock upon hold expiration. | Booking / Reet | `STORY-BKG-02` (S1) | `services/hold.service.js` | `TC-BKG-02` | **Implemented / In Review** | Inventory recalculation verified in `ticket.service.test.js`. Issue #21. |
-| **FR-010** | Atomic booking confirmation in single PostgreSQL transaction (`FOR UPDATE`). | Booking / Reet | `STORY-BKG-03` (S2) | `controllers/booking.controller.js`<br>`services/booking.service.js` | `TC-BKG-03`<br>`TC-PERF-03` | **Implemented / In Review** | Concurrency safety verified in service tests. Issue #22. |
-| **FR-011** | Dynamic QR pass generation with HMAC-SHA256 signature and PNG data URL. | QR / Sambhram | `STORY-QR-01` (S1) | `services/qr.service.js`<br>`controllers/qr.controller.js` | `TC-QR-01`<br>`TC-QR-04`<br>`TC-QR-05` | **Working / Verified** | Verified in `qr.service.test.js` & `qr.routes.test.js`. Generates 64-hex HMAC signature. Issue #23. |
-| **FR-012** | Client pass presentation screen with attendee name, tier, and QR code. | QR / Sambhram | `STORY-INT-01` (S1) | `client/src/pages/AttendeePass.jsx`<br>`client/src/services/passApi.js` | `TC-UX-02` | **Working / Verified** | Verified in `attendeePass.routes.test.js` & React UI. Supported by PR #47. Authenticates via POST /api/auth/login. Issue #24. |
-| **FR-013** | Gate staff device camera pass scanning, signature/expiry verification, and RBAC authentication guard. | Scanner / Sambhram | `STORY-SCN-01` (S1)<br>`STORY-SCN-02` (S2) | `services/checkin.service.js`<br>`routes/checkin.routes.js`<br>`client/src/pages/GateScanner.jsx`<br>`client/src/components/StaffLogin.jsx` | `TC-QR-02`<br>`TC-QR-03`<br>`TC-SCN-03` | **Working / Verified** | Verified in `checkin.routes.test.js` (21 tests), `StaffLogin.jsx` & `GateScanner.jsx`. Enforces 401 unauthenticated and 403 attendee guards, restricting scans to GATE_STAFF, STAFF, and ADMIN. |
-| **FR-014** | Record first scan as `CHECKED_IN`; reject subsequent scans as `DUPLICATE_ENTRY`. | Scanner / Sambhram | `STORY-SCN-01` (S1) | `services/checkin.service.js`<br>`routes/checkin.routes.js` | `TC-SCN-01`<br>`TC-SCN-02` | **Working / Verified** | Verified in `checkin.routes.test.js` & `checkin.service.test.js`. Enforces atomic check-and-set, duplicate rejection (409), central ticket existence validation, and concurrency safety under simultaneous scans. |
-| **FR-015** | Attendee joins FIFO waitlist when ticket tier available seats reach zero. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js` | `TC-WTL-01` | **Implemented / In Review** | Redis FIFO queue structures prepared for high concurrency. Issue #27. |
-| **FR-016** | Automatic email notification & 15-minute slot reservation for waitlist head on cancel. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js` | `TC-WTL-02`<br>`TC-WTL-03` | **Implemented / In Review** | Background worker queue designed. Issue #28. |
-| **FR-017** | Real-time check-in scan velocity and attendance percentage on organizer dashboard. | Telemetry / Sambhram | `STORY-TEL-01` (S2) | `routes/telemetry.routes.js`<br>`client/src/pages/Dashboard.jsx` | `TC-ANL-01` | **Implemented / In Review** | Telemetry queries and check-in metrics verified. Issue #29. |
-| **FR-018** | Export attendance and revenue summaries as downloadable CSV and PDF files. | Telemetry / Sambhram | `STORY-TEL-01` (S2) | `services/report.service.js` | `TC-ANL-02` | **Implemented / In Review** | Report queries aligned with PostgreSQL schema. Issue #30. |
-| **FR-019** | Admin event moderation (approve/flag/remove) and user account deactivation. | Admin / Sanchita | `STORY-ADM-01` (S2) | `services/admin.service.js`<br>`routes/admin.routes.js`<br>`client/src/pages/AdminPanel.jsx` | `TC-ADM-01`<br>`TC-ADM-02` | **Working / Verified** | Verified in `tests/admin.test.js` (16 tests): `/api/admin/*` is ADMIN only, approve, reject, flag, remove, and a deactivated user's next request returns 401. Issue #31 closed. |
+| **FR-003** | JWT Bearer token authentication & role restriction (401/403). | Auth / Saatvik | `STORY-AUTH-02` (S1) | `middleware/auth.middleware.js`<br>`middleware/rbac.middleware.js` | `TC-AUTH-04`<br>`TC-AUTH-05` | **Working / Verified** | Verified in `tests/auth.test.js` & `auth.middleware.test.js`. Enforces 401/403 guards. Issue #15 closed. |
+| **FR-004** | Event catalog search & multi-parameter filtering (category, date, venue, price). | Events / Sanchita | `STORY-EVT-01` (S1)<br>`STORY-EVT-02` (S1) | `services/event.service.js`<br>`routes/event.routes.js`<br>`client/src/pages/EventCatalog.jsx` | `TC-EVT-01`<br>`TC-EVT-02` | **Working / Verified** | Verified in `tests/events.test.js` (19 tests). Every filter alone & combined. Issue #16 closed. |
+| **FR-005** | Organizer event creation, editing, scheduling, and draft management. | Events / Sanchita | `STORY-EVT-03` (S2) | `services/event.service.js`<br>`controllers/event.controller.js`<br>`client/src/pages/OrganizerDashboard.jsx` | `TC-EVT-03` | **Working / Verified** | Verified in `tests/event_management.test.js` (20 tests). Enforces ownership checks. Issue #17 closed. |
+| **FR-006** | Formal event lifecycle state machine (`DRAFT` $\to$ `LIVE` $\to$ `COMPLETED`). | Events / Sanchita | `STORY-EVT-03` (S2) | `services/event_state.service.js`<br>`PATCH /api/events/:id/status` | `TC-EVT-04`<br>`TC-EVT-05` | **Working / Verified** | Verified in `tests/event_lifecycle.test.js` (17 tests). Illegal moves return 409 `INVALID_TRANSITION`. Issue #18 closed. |
+| **FR-007** | Organizer ticket tier definition (Early Bird, VIP) with independent quotas/prices. | Events / Sanchita | `STORY-BKG-01` (S1) | `services/tier.service.js`<br>`controllers/tier.controller.js`<br>`client/src/components/TierManager.jsx` | `TC-TCK-01` | **Working / Verified** | Verified in `tests/tiers.test.js` (16 tests) & `tier.controller.test.js` (2 tests). Issue #19 closed. |
+| **FR-008** | 10-minute temporary seat reservation hold using Redis key TTL 600 s & DB locks. | Booking / Reet | `STORY-BKG-02` (S1) | `services/booking-hold.service.js`<br>`routes/booking.routes.js` | `TC-BKG-01` | **Working / Verified** | Verified in `booking-hold.postgres.test.js` (24 tests) in CI. Zero overselling under concurrent requests. Issue #20 closed. |
+| **FR-009** | Automatic return of held seats to stock upon hold expiration. | Booking / Reet | `STORY-BKG-02` (S1) | `services/hold-expiry.worker.js`<br>`services/booking-hold.service.js` | `TC-BKG-02` | **Working / Verified** | Verified in `booking-hold.postgres.test.js` & `ticket.service.test.js`. Issue #21 closed. |
+| **FR-010** | Atomic booking confirmation in single PostgreSQL transaction (`FOR UPDATE`). | Booking / Reet | `STORY-BKG-03` (S2) | `controllers/booking.controller.js`<br>`services/booking-confirmation.service.js` | `TC-BKG-03`<br>`TC-PERF-03` | **Working / Verified** | Verified in `booking-hold.postgres.test.js` against PostgreSQL 16 in CI. Issue #22 closed. |
+| **FR-011** | Dynamic QR pass generation with HMAC-SHA256 signature and PNG data URL. | QR / Sambhram | `STORY-QR-01` (S1) | `services/qr.service.js`<br>`controllers/qr.controller.js` | `TC-QR-01`<br>`TC-QR-04`<br>`TC-QR-05` | **Working / Verified** | Verified in `qr.service.test.js` (27 tests) & `qr.routes.test.js` (18 tests). Issue #23 closed. |
+| **FR-012** | Client pass presentation screen with attendee name, tier, and QR code. | QR / Sambhram | `STORY-INT-01` (S1) | `client/src/pages/AttendeePass.jsx`<br>`client/src/services/passApi.js` | `TC-UX-02` | **Working / Verified** | Verified in `attendeePass.routes.test.js` (18 tests) & React UI (PR #47, #58). Issue #24 closed. |
+| **FR-013** | Gate staff device camera pass scanning, signature/expiry verification, and RBAC guard. | Scanner / Sambhram | `STORY-SCN-01` (S1)<br>`STORY-SCN-02` (S2) | `services/checkin.service.js`<br>`routes/checkin.routes.js`<br>`client/src/pages/GateScanner.jsx` | `TC-QR-02`<br>`TC-QR-03`<br>`TC-SCN-03` | **Working / Verified** | Verified in `checkin.routes.test.js` (21 tests). Restricts scans to GATE_STAFF/STAFF/ADMIN. Issue #25 closed. |
+| **FR-014** | Record first scan as `CHECKED_IN`; reject subsequent scans as `DUPLICATE_ENTRY`. | Scanner / Sambhram | `STORY-SCN-01` (S1) | `services/checkin.service.js`<br>`routes/checkin.routes.js` | `TC-SCN-01`<br>`TC-SCN-02` | **Working / Verified** | Verified in `checkin.routes.test.js` (21) & `checkin.service.test.js` (14). Enforces duplicate 409 lock. Issue #26 closed. |
+| **FR-015** | Attendee joins FIFO waitlist when ticket tier available seats reach zero. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js`<br>`0002_fifo_waitlist_claim_allocations.sql` | `TC-WTL-01` | **Working / Verified** | Verified in `waitlist.postgres.test.js` (5 tests) in CI. Issue #27 closed. |
+| **FR-016** | Automatic email/UI notification & 15-minute claim reservation for waitlist head. | Waitlist / Reet | `STORY-WTL-01` (S2) | `services/waitlist.service.js`<br>`client/src/pages/WaitlistNotifications.jsx` | `TC-WTL-02`<br>`TC-WTL-03` | **Working / Verified** | Verified in `waitlist.postgres.test.js` & simulated notification UI (DEV-003). Issue #28 closed. |
+| **FR-017** | Real-time check-in scan velocity and attendance percentage dashboard (SSE). | Telemetry / Sambhram | `STORY-TEL-01` (S2) | `services/telemetry.service.js`<br>`routes/telemetry.routes.js`<br>`client/src/pages/OrganizerDashboard.jsx` | `TC-ANL-01` | **Working / Verified** | Verified in `telemetry.service.test.js` (16 tests) & `telemetry.routes.test.js` (20 tests). PR #59. Issue #29 closed. |
+| **FR-018** | Export attendance and revenue summaries as downloadable CSV and PDF files. | Telemetry / Sambhram | `STORY-TEL-01` (S2) | `services/report.service.js`<br>`utils/csv.util.js`<br>`utils/pdf.util.js` | `TC-ANL-02` | **Working / Verified** | Verified in `report.service.test.js` (19), `report.routes.test.js` (24), `csv.util.test.js` (13), `pdf.util.test.js` (11). PR #60. Issue #30 closed. |
+| **FR-019** | Admin event moderation (approve/flag/remove) and user account deactivation. | Admin / Sanchita | `STORY-ADM-01` (S2) | `services/admin.service.js`<br>`routes/admin.routes.js`<br>`client/src/pages/AdminPanel.jsx` | `TC-ADM-01`<br>`TC-ADM-02` | **Working / Verified** | Verified in `tests/admin.test.js` (16 tests): `/api/admin/*` ADMIN only, deactivated users immediately receive 401. Issue #31 closed. |
 
 ---
 
@@ -50,75 +50,80 @@ This matrix establishes bidirectionality between the approved Software Requireme
 | Req ID | Requirement Summary | Module & Owner | Issue # | Evidence & Verification Reference | Current Status |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | **SEC-001** | Secure password storage with bcrypt ($\ge 10$ salt rounds) | Auth / Saatvik | #39 | `server/src/utils/password.util.js`; verified in `tests/auth.test.js` (`TC-AUTH-03`, `TC-SEED-01`). Issue #39 closed. | **Working / Verified** |
-| **SEC-002** | Enforce role-based access control (RBAC) on all protected routes | Auth / Saatvik | #40 | `server/src/middleware/rbac.middleware.js`; verified in `tests/auth.test.js` (`TC-SEC-01`, `TC-SEC-02`, `TC-MID-01`) & `tests/admin.test.js`. Issue #40 closed. | **Working / Verified** |
-| **SEC-003** | Prevent SQL injection and cross-site scripting (XSS) vulnerabilities | Auth / Saatvik | #41 | `server/src/config/db.js` parameterized queries; validated in `tests/auth.test.js` (`TC-SEC-04` through `TC-SEC-07`). Issue #41 closed. | **Working / Verified** |
-| **SEC-004** | Configure TLS 1.3 for external communication & HTTP redirect | Security / Sanchita | #42 | `deploy/nginx/proxy.conf`; `scripts/check-tls.sh` 5/5 checks pass (TLS 1.3 accepted, TLS 1.2 rejected, 301 to HTTPS, HSTS, API proxy). Issue #42 closed. | **Working / Verified** |
-| **SEC-005** | Implement security audit logging for failed logins & admin actions | Security / Sambhram | #43 | Central audit service (`server/src/services/audit.service.js`); admin endpoint (`GET /api/admin/audit-logs`); schema & immutability trigger in `server/db/schema.sql`. Verified in `src/services/audit.service.test.js` (12 tests, 100% lines), `tests/audit.test.js` (13 tests), and `tests/schema.test.js` (13 tests). Covers failed login auditing (unknown users, wrong passwords, deactivated accounts), rejected scans, administrative actions, and admin review endpoint. Issue #43. | **Working / Verified** |
-| **SEC-006** | Secure QR signatures and cryptographic pass verification | QR / Sambhram | #44 | Deterministic HMAC-SHA256 signing of canonical payload (`ticketId`, `eventId`, `userId`, `issuedAt`, `expiresAt`), constant-time signature verification (`crypto.timingSafeEqual`), strict 64-hex string validation, and fail-closed application startup enforcement when `QR_HMAC_SECRET` is missing/empty. Verified in `server/src/services/qr.service.test.js` (27/27 passed, 100% coverage) & `server/src/routes/qr.routes.test.js` (18/18 passed). | **Working / Verified** |
-| **NFR-001** | Catalog search p95 within 150 ms at 500 concurrent users | Events / Sanchita | #32 | `tests/perf/search.perf.test.js` in CI; `npm run bench:search`; results in `docs/perf/NFR-001_Search_Performance.md`. Issue #32 closed. | **Working / Verified** |
-| **NFR-002** | QR verification and check-in database write latency target ($\text{p99} < 200\text{ ms}$) | DevOps / Sambhram | #33 | High-precision timing in `server/src/controllers/checkin.controller.js` (`Server-Timing: checkin;dur=...`); 1,000-scan benchmark in `server/scripts/bench-checkin.js` (`npm run bench:checkin`); automated CI performance test in `tests/perf/checkin.perf.test.js`; performance report in `docs/perf/NFR-002_Checkin_Latency.md`. p99 controller processing time: 0.84 ms (< 200 ms). Issue #33. | **Working / Verified** |
-| **NFR-004** | Health checks, 60s availability monitoring & 99.5% uptime target | DevOps / Sambhram | #35 | Health check routes (`/api/health`, `/api/health/live`, `/api/health/ready`), 60s background availability poller (`server/src/services/availability.service.js`), downtime incident recording, persistent state file, and admin review endpoint (`GET /api/admin/availability`). Verified in `src/services/health.service.test.js` (19 tests), `src/services/availability.service.test.js` (29 tests), and `tests/health.test.js` (13 tests) [61 tests total]. 61 passed, 0 failures across 3 health and availability test suites. Issue #35. | **Working / Verified** |
-| **NFR-005** | Home to confirmed booking in 4 screens or fewer | UX / Sanchita | #36 | 4-screen flow with progress bar; `docs/NFR-005_Booking_Journey.md`. | **Implemented / In Review** |
-| **NFR-006** | Enforce Jest coverage thresholds in CI ($\ge 80\%$ statements & branches) | DevOps / Saatvik | #37 | Enforced in `server/package.json` and `.github/workflows/ci.yml`. Current: **95.71% statements**, **88.79% branches**, **95.63% lines**. Issue #37 closed. | **Working / Verified** |
-| **OPS-001** | PostgreSQL schema with keys and constraints | Database / Sanchita | #45 | `server/db/schema.sql`; `tests/schema.test.js` (12 tests); `npm run db:init` verified. Issue #45 closed. | **Working / Verified** |
-| **OPS-002** | Full stack containerization with Docker Compose | DevOps / Saatvik | #46 | `docker-compose.yml`, `server/Dockerfile`, `client/Dockerfile`; validated. Issue #46 closed. | **Working / Verified** |
+| **SEC-002** | Enforce role-based access control (RBAC) on all protected routes | Auth / Saatvik | #40 | `server/src/middleware/rbac.middleware.js`; verified in `tests/auth.test.js`, `auth.middleware.test.js` & `tests/admin.test.js`. Issue #40 closed. | **Working / Verified** |
+| **SEC-003** | Prevent SQL injection and cross-site scripting (XSS) vulnerabilities | Auth / Saatvik | #41 | `server/src/config/db.js` parameterized queries; validated in `tests/auth.test.js` (`TC-SEC-04`–`07`) & `csv.util.test.js`. Issue #41 closed. | **Working / Verified** |
+| **SEC-004** | Configure TLS 1.3 for external communication & HTTP redirect | Security / Sanchita | #42 | `deploy/nginx/proxy.conf`; `scripts/check-tls.sh` 5/5 checks pass. Issue #42 closed. | **Working / Verified** |
+| **SEC-005** | Implement security audit logging for failed logins & admin actions | Security / Sambhram | #43 | `server/src/services/audit.service.js`; `GET /api/admin/audit-logs`. Verified in `audit.service.test.js` (12) & `audit.test.js` (13). Issue #43 closed. | **Working / Verified** |
+| **SEC-006** | Secure QR signatures and cryptographic pass verification | QR / Sambhram | #44 | Deterministic HMAC-SHA256 + `crypto.timingSafeEqual` + fail-closed startup. Verified in `qr.service.test.js` (27) & `qr.routes.test.js` (18). Issue #44 closed. | **Working / Verified** |
+| **NFR-001** | Catalog search p95 within 150 ms at 500 concurrent users | Events / Sanchita | #32 | `tests/perf/search.perf.test.js` in CI; `npm run bench:search`; report in `docs/perf/NFR-001_Search_Performance.md`. Issue #32 closed. | **Working / Verified** |
+| **NFR-002** | QR verification and check-in latency target ($\text{p99} < 200\text{ ms}$) | DevOps / Sambhram | #33 | `Server-Timing` metrics; `bench-checkin.js`; `checkin.perf.test.js` (4 tests); p99: 0.84 ms. Issue #33 closed. | **Working / Verified** |
+| **NFR-004** | Health checks, 60s availability monitoring & 99.5% uptime target | DevOps / Sambhram | #35 | `/api/health`, `/live`, `/ready`; `availability.service.js`. Verified across 3 suites (61 tests total). Issue #35 closed. | **Working / Verified** |
+| **NFR-005** | Home to confirmed booking in 4 screens or fewer | UX / Sanchita | #36 | 4-screen UI flow with progress bar (`docs/NFR-005_Booking_Journey.md`); API endpoints wired; 5-user walkthrough open (#36). | **Implemented / In Review** |
+| **NFR-006** | Enforce Jest coverage thresholds in CI ($\ge 80\%$ statements & branches) | DevOps / Saatvik | #37 | Enforced in `server/package.json` & CI. Run `#42875623511`: **92.42% Stmts, 82.17% Branches, 93.67% Lines**. Issue #37 closed. | **Working / Verified** |
+| **NFR-007** | Preserve audit and booking records for one year | Retention / Reet | #38 | PostgreSQL triggers/policies in migrations + verified in `nfr-007-retention.postgres.test.js`. Issue #38 closed. | **Working / Verified** |
+| **OPS-001** | PostgreSQL schema with keys and constraints | Database / Sanchita | #45 | `server/db/schema.sql`, migrations `0001`–`0002`, `schema.test.js` (13), `migration-runner.test.js` (8), `migration-postgres.test.js` (4). Issue #45 closed. | **Working / Verified** |
+| **OPS-002** | Full stack containerization with Docker Compose | DevOps / Saatvik | #46 | `docker-compose.yml`, `server/Dockerfile`, `client/Dockerfile`. Issue #46 closed. | **Working / Verified** |
 
 ---
 
-## 3. Current Test Suite Status (Empirically Verified)
+## 3. Final Test Suite Execution Status (CI Run `#42875623511`)
 
 ```
-Test Suites: 26 passed, 26 of 30 total (4 PostgreSQL integration suites skipped when TEST_DATABASE_URL is not set)
-Tests:       349 passed, 37 skipped, 386 total
-Status:      Latest backend execution: 349 passed, 37 skipped, 0 failures. PostgreSQL integration tests were skipped because TEST_DATABASE_URL was not configured.
+Test Suites: 36 passed, 36 total
+Tests:       495 passed, 495 total (0 failed, 0 skipped)
+Coverage:    92.42% statements (2464/2666), 82.17% branches (1351/1644), 97.83% functions (361/369), 93.67% lines (2327/2484)
+Frontend:    oxlint (0 errors) + Vite production build (65 modules built in 161ms)
+Status:      100% PASS across all 36 backend suites and frontend pipeline
 ```
 
-| Suite File | Module Under Test | Test Cases Passed | Status |
+| Suite File | Module Under Test | Tests Passed | Status |
 | :--- | :--- | :---: | :---: |
-| `tests/auth.test.js` | Authentication, Privilege Escalation Guard, Admin Provisioning, SQLi/XSS & Middleware | 31 | **PASSED** |
-| `tests/audit.test.js` | Security Audit Logging Integration (AC-1, AC-2, AC-3) | 13 | **PASSED** |
+| `tests/auth.test.js` | Authentication, Privilege Escalation Guard, Provisioning, SQLi/XSS & Middleware | 31 | **PASSED** |
+| `src/middleware/auth.middleware.test.js` | Authentication & Deactivation Middleware Guards | 4 | **PASSED** |
+| `src/utils/jwt.util.test.js` | JWT Signing & Verification Utility | 2 | **PASSED** |
+| `tests/admin.test.js` | Admin Moderation & Account Deactivation (`FR-019`) | 16 | **PASSED** |
+| `tests/audit.test.js` | Security Audit Logging Integration (`SEC-005`) | 13 | **PASSED** |
+| `src/services/audit.service.test.js` | Central Audit Service Unit Tests | 12 | **PASSED** |
 | `tests/health.test.js` | Health Check API Integration (`/api/health`, `/live`, `/ready`, `/admin/availability`) | 13 | **PASSED** |
-| `src/services/health.service.test.js` | Health Probing, Dependency Isolation, Sanitization & Liveness/Readiness | 19 | **PASSED** |
-| `src/services/availability.service.test.js` | 60s Availability Poller, Outage Recording, State Persistence & SLA | 29 | **PASSED** |
-| `src/services/audit.service.test.js` | Central Audit Service Unit Tests, Persistence & Error Handling | 12 | **PASSED** |
-| `src/routes/qr.routes.test.js` | QR Pass Generation API, Access Guards, Integrity & Token Security | 18 | **PASSED** |
-| `src/services/qr.service.test.js` | QR Cryptographic Signatures (SEC-006) | 27 | **PASSED** |
-| `src/services/ticket.service.test.js` | Ticket Metadata & Formatting | 10 | **PASSED** |
-| `src/services/checkin.service.test.js` | Check-in Validation Logic, Ticket Existence & Concurrency | 12 | **PASSED** |
-| `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Auth | 12 | **PASSED** |
-| `src/routes/checkin.routes.test.js` | Gate Check-in API, Ticket Existence, Duplicate Check & Gate Staff RBAC | 21 | **PASSED** |
-| `tests/schema.test.js` | PostgreSQL Schema Constraints & Audit Log Immutability (OPS-001, SEC-005) | 13 | **PASSED** |
-| `tests/events.test.js` | Catalog Search & Filters (FR-004) | 19 | **PASSED** |
-| `tests/event_management.test.js` | Organizer Event Management (FR-005) | 20 | **PASSED** |
-| `tests/tiers.test.js` | Ticket Tiers (FR-007, BR-001) | 16 | **PASSED** |
-| `tests/event_lifecycle.test.js` | Lifecycle, BR-005, BR-006 (FR-006) | 17 | **PASSED** |
-| `tests/admin.test.js` | Admin Moderation & Deactivation (FR-019) | 16 | **PASSED** |
-| `tests/perf/search.perf.test.js` | Catalog Search Performance (NFR-001) | 2 | **PASSED** |
-| `tests/perf/checkin.perf.test.js` | QR Verification & Check-in Latency (NFR-002) | 3 | **PASSED** |
-| `tests/migration-runner.test.js` | Database Schema Migrations | 8 | **PASSED** |
-| `src/controllers/checkin.controller.test.js` | Check-in Controller Dispatch & Error Handling | 5 | **PASSED** |
-| `src/controllers/tier.controller.test.js` | Tier Controller Validation & Responses | 2 | **PASSED** |
-| `src/config/redis.test.js` | Redis Connection & Configuration | 5 | **PASSED** |
-| `src/middleware/auth.middleware.test.js` | Authentication & RBAC Middleware | 4 | **PASSED** |
-| `src/utils/jwt.util.test.js` | JWT Token Utility | 2 | **PASSED** |
-| **Total** | **All Executed Test Suites** | **349** | **ALL GREEN (100%)** |
+| `src/services/health.service.test.js` | Health Dependency Probing & Sanitization | 19 | **PASSED** |
+| `src/services/availability.service.test.js` | 60s Availability Poller, Outage Persistence & SLA | 29 | **PASSED** |
+| `src/services/booking-hold.postgres.test.js` | 10-Min Holds, Expiry Return & Atomic Booking (`FR-008`–`010`) | 24 | **PASSED** |
+| `src/services/waitlist.postgres.test.js` | FIFO Waitlist Queue & Claim Windows (`FR-015`, `FR-016`) | 5 | **PASSED** |
+| `src/services/ticket.service.test.js` | Ticket Metadata & State Retrieval | 10 | **PASSED** |
+| `src/services/qr.service.test.js` | QR Cryptographic Signatures & `timingSafeEqual` (`SEC-006`) | 27 | **PASSED** |
+| `src/routes/qr.routes.test.js` | QR Pass Generation API & Integrity Protection | 18 | **PASSED** |
+| `src/routes/attendeePass.routes.test.js` | Digital Pass Retrieval & Experience (`FR-012`) | 18 | **PASSED** |
+| `src/services/checkin.service.test.js` | Check-in Logic, Ticket Validation & Concurrency | 14 | **PASSED** |
+| `src/controllers/checkin.controller.test.js` | Check-in Controller Dispatch & `Server-Timing` | 5 | **PASSED** |
+| `src/routes/checkin.routes.test.js` | Gate Check-in API, Duplicate Check & Gate RBAC (`FR-013`, `FR-014`) | 21 | **PASSED** |
+| `src/services/telemetry.service.test.js` | Attendance Telemetry & Scan Velocity (`FR-017`) | 16 | **PASSED** |
+| `src/routes/telemetry.routes.test.js` | Telemetry SSE Streaming & Auth Filtering (`FR-017`) | 20 | **PASSED** |
+| `src/services/report.service.test.js` | Attendance & Revenue Aggregation (`FR-018`) | 19 | **PASSED** |
+| `src/routes/report.routes.test.js` | Report Export Routes & Download Formats (`FR-018`) | 24 | **PASSED** |
+| `src/utils/csv.util.test.js` | CSV Formula Injection Guard & Formatting | 13 | **PASSED** |
+| `src/utils/pdf.util.test.js` | PDF Export Generator | 11 | **PASSED** |
+| `tests/schema.test.js` | PostgreSQL Schema Constraints & Immutability (`OPS-001`) | 13 | **PASSED** |
+| `tests/migration-runner.test.js` | Database Migration Runner | 8 | **PASSED** |
+| `tests/migration-postgres.test.js` | Live PostgreSQL Migrations Execution | 4 | **PASSED** |
+| `tests/nfr-007-retention.postgres.test.js` | 1-Year Record Retention Enforcement (`NFR-007`) | 1 | **PASSED** |
+| `tests/events.test.js` | Catalog Search & Filters (`FR-004`) | 19 | **PASSED** |
+| `tests/event_management.test.js` | Organizer Event Management (`FR-005`) | 20 | **PASSED** |
+| `tests/tiers.test.js` | Ticket Tiers (`FR-007`, `BR-001`) | 16 | **PASSED** |
+| `src/controllers/tier.controller.test.js` | Tier Controller Validation | 2 | **PASSED** |
+| `tests/event_lifecycle.test.js` | Event Lifecycle FSM (`FR-006`) | 17 | **PASSED** |
+| `src/config/redis.test.js` | Redis Connection & Failover | 5 | **PASSED** |
+| `tests/perf/search.perf.test.js` | Catalog Search Performance (`NFR-001`) | 2 | **PASSED** |
+| `tests/perf/checkin.perf.test.js` | QR Verification Latency (`NFR-002`) | 4 | **PASSED** |
+| **Total** | **All 36 Backend Test Suites** | **495** | **ALL GREEN (100%)** |
 
 ---
 
-## 4. Deliverables Part-3 Documentation References
+## 4. Final Deliverables & Viva Documentation Links
 
-The official testing reports generated for Deliverables Part-3 (2nd Nov to 6th Nov 2026) are uploaded in the `docs/` folder:
-
-* **Unit Test Report:** [docs/UNIT_TEST_REPORT.md](file:///d:/Projects/Skills/PassPulse_repo/docs/UNIT_TEST_REPORT.md)
-* **System Validation Report:** [docs/SYSTEM_VALIDATION_REPORT.md](file:///d:/Projects/Skills/PassPulse_repo/docs/SYSTEM_VALIDATION_REPORT.md)
-* **Code Coverage Report:** [docs/CODE_COVERAGE_REPORT.md](file:///d:/Projects/Skills/PassPulse_repo/docs/CODE_COVERAGE_REPORT.md)
-* **Branch Coverage Report:** [docs/BRANCH_COVERAGE_REPORT.md](file:///d:/Projects/Skills/PassPulse_repo/docs/BRANCH_COVERAGE_REPORT.md)
-* **Updated Test Cases Document:** [docs/TEST_CASES_UPDATED.md](file:///d:/Projects/Skills/PassPulse_repo/docs/TEST_CASES_UPDATED.md)
-
----
-
-## 5. Sprint-3 Parallel Activity (2nd Nov – 6th Nov 2026)
-
-* **Status:** Parallel Activity in Progress.
-* **Scope:** With the core authentication, RBAC, event catalog, ticketing tiers, QR passes, gate scanner, and admin moderation features completed during Sprints 1 and 2, the parallel Sprint-3 window is dedicated to comprehensive test execution, branch boundary validation, security hardening against SQL injection/XSS (`SEC-003`), and generating formal verification reports.
-* **Lead Sign-off:** Saatvik Gupta (`PES1UG24CS395`) certifies that all assigned authentication and security deliverables are 100% verified with zero outstanding defects.
+* **Unit Test Report:** [`docs/UNIT_TEST_REPORT.md`](UNIT_TEST_REPORT.md)
+* **System Validation Report:** [`docs/SYSTEM_VALIDATION_REPORT.md`](SYSTEM_VALIDATION_REPORT.md)
+* **Code Coverage Report:** [`docs/CODE_COVERAGE_REPORT.md`](CODE_COVERAGE_REPORT.md)
+* **Branch Coverage Report:** [`docs/BRANCH_COVERAGE_REPORT.md`](BRANCH_COVERAGE_REPORT.md)
+* **Updated Test Cases:** [`docs/TEST_CASES_UPDATED.md`](TEST_CASES_UPDATED.md)
+* **Final Evaluation Checklist:** [`docs/FINAL_EVALUATION_CHECKLIST.md`](FINAL_EVALUATION_CHECKLIST.md)
+* **Viva & Demo Preparation Guide:** [`docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md`](VIVA_AND_DEMO_PREPARATION_GUIDE.md)

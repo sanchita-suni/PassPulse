@@ -500,3 +500,37 @@ Status:      349 passed, 37 skipped, 0 failures (Latest Execution)
 #### Performance Suite Breakdown (NFR-001 & NFR-002)
 * `tests/perf/search.perf.test.js`: 2 passed (NFR-001)
 * `tests/perf/checkin.perf.test.js`: 3 passed, 1 skipped (NFR-002)
+
+
+---
+
+### 3.4 Final Full-Stack CI Execution Summary (PRs #58, #59, #60 Merged — CI Run `#42875623511`)
+
+With PostgreSQL `16-alpine` and Redis `7-alpine` active in GitHub Actions CI, all 4 previously skipped database integration suites along with newly merged Telemetry (`FR-017`) and Attendance/Revenue Report Export (`FR-018`) suites executed completely:
+
+```
+Test Suites: 36 passed, 36 total
+Tests:       495 passed, 495 total (0 failed, 0 skipped)
+Statements:  92.42% (2464 / 2666)
+Branches:    82.17% (1351 / 1644)
+Functions:   97.83% (361 / 369)
+Lines:       93.67% (2327 / 2484)
+CI Status:   ALL GREEN (Backend 36/36 + Frontend oxlint & Vite build)
+```
+
+#### Added & Integrated Final Submission Suites
+* **Concurrent Holds, Confirmations & Retention (`FR-008`, `FR-009`, `FR-010`, `NFR-007`):**
+  * `src/services/booking-hold.postgres.test.js`: 24 passed
+  * `src/services/waitlist.postgres.test.js` (`FR-015`, `FR-016`): 5 passed
+  * `tests/migration-postgres.test.js`: 4 passed
+  * `tests/nfr-007-retention.postgres.test.js`: 1 passed
+* **Attendee Pass Experience (`FR-012`):**
+  * `src/routes/attendeePass.routes.test.js`: 18 passed
+* **Live Attendance Telemetry & SSE Streams (`FR-017`):**
+  * `src/services/telemetry.service.test.js`: 16 passed
+  * `src/routes/telemetry.routes.test.js`: 20 passed
+* **Attendance & Revenue Exports (`FR-018`):**
+  * `src/services/report.service.test.js`: 19 passed
+  * `src/routes/report.routes.test.js`: 24 passed
+  * `src/utils/csv.util.test.js`: 13 passed
+  * `src/utils/pdf.util.test.js`: 11 passed

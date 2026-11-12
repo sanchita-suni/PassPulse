@@ -160,17 +160,23 @@ Six 2-week Agile Scrum sprints:
 | 5 | 6–7 | QR generation, gate scanner, telemetry |
 | 6 | 7–8 | Admin moderation, Dockerization, Jenkins CI, final report |
 
-## Documentation
+## Documentation & Evaluation Deliverables
 
 - [`docs/PassPulse_Project_Synopsis.pdf`](docs/PassPulse_Project_Synopsis.pdf) — Phase 1 synopsis
 - [`docs/PassPulse_Deliverable2_Requirements_SRS.pdf`](docs/PassPulse_Deliverable2_Requirements_SRS.pdf) — SRS v2.0, validation specification, and SPMP
-- [`docs/PassPulse_SRS_SAD_STP.pdf`](docs/PassPulse_SRS_SAD_STP.pdf) — Complete SRS, SAD, and STP specification
-- [`docs/TRACEABILITY_AND_TEST_STATUS.md`](docs/TRACEABILITY_AND_TEST_STATUS.md) — Master Requirements Traceability & Verification Matrix
+- [`docs/PassPulse_SRS_SAD_STP.pdf`](docs/PassPulse_SRS_SAD_STP.pdf) — Complete IEEE SRS v2.1, SAD v1.0, and STP v1.0 specification (31 pages)
+- [`docs/FINAL_EVALUATION_CHECKLIST.md`](docs/FINAL_EVALUATION_CHECKLIST.md) — Part 1–4 evaluation checklist mapped to repository artifacts & CI runs
+- [`docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md`](docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md) — Final Demo & Viva FAQs, member contributions, deviations defense, and 2-min demo script
+- [`docs/TRACEABILITY_AND_TEST_STATUS.md`](docs/TRACEABILITY_AND_TEST_STATUS.md) — Master Requirements Traceability & Verification Matrix (`FR-001`–`FR-019`, `SEC-001`–`006`, `NFR-001`–`007`)
 - [`docs/TEST_CASES_UPDATED.md`](docs/TEST_CASES_UPDATED.md) — Mini-Project Part-3 Updated Test Cases Document
-- [`docs/UNIT_TEST_REPORT.md`](docs/UNIT_TEST_REPORT.md) — Mini-Project Part-3 Unit Test Report (195/195 tests passed)
+- [`docs/UNIT_TEST_REPORT.md`](docs/UNIT_TEST_REPORT.md) — Mini-Project Part-3 Unit Test Report (`495/495` tests across `36/36` suites passing in CI Run `#42875623511`)
 - [`docs/SYSTEM_VALIDATION_REPORT.md`](docs/SYSTEM_VALIDATION_REPORT.md) — Mini-Project Part-3 System Validation Report
-- [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) — Mini-Project Part-3 Code Coverage Report (95.71% Stmts, 88.79% Branches)
-- [`docs/BRANCH_COVERAGE_REPORT.md`](docs/BRANCH_COVERAGE_REPORT.md) — Mini-Project Part-3 Branch Coverage Report
+- [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) — Mini-Project Part-3 Code Coverage Report (`92.42%` Statements, `97.83%` Functions, `93.67%` Lines)
+- [`docs/BRANCH_COVERAGE_REPORT.md`](docs/BRANCH_COVERAGE_REPORT.md) — Mini-Project Part-3 Branch Coverage Report (`82.17%` Branches — exceeds 80% `NFR-006` CI gate)
 - [`docs/SPRINT_PLAN.md`](docs/SPRINT_PLAN.md) — Agile Sprint Plan & Work Allocations
 - [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) — Git workflow, branch protections, and CI/CD policies
-- [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) — Architectural and requirement deviations register
+- [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) — Architectural and requirement deviations register (`DEV-001`–`DEV-008`)
+
+### Sprint Demo Videos
+- [`docs/demo/PassPulse_Sprint1_Demo.mp4`](docs/demo/PassPulse_Sprint1_Demo.mp4) — Sprint 1 MVP 1-minute working product demo (uploaded)
+- `docs/demo/PassPulse_Sprint2_Demo.mp4` — Sprint 2 final 2-minute demo target path (script in `docs/VIVA_AND_DEMO_PREPARATION_GUIDE.md`)
