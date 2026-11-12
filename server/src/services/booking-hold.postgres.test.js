@@ -219,6 +219,31 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     expect(rows[0]).toMatchObject({ user_id: userId, event_id: eventId, tier_id: tierId, quantity: 1, status: 'ACTIVE' });
   });
 
+  test('expires the Redis projection at its deadline and releases the durable reservation', async () => {
+    const hold = await createHold({ userId, eventId, tierId, quantity: 1 });
+    const key = `${HOLD_KEY_PREFIX}${hold.holdId}`;
+    const expiresAt = redis.entries.get(key).expiresAt;
+
+    jest.spyOn(Date, 'now').mockReturnValue(expiresAt);
+    try {
+      expect(await redis.get(key)).toBeNull();
+      expect(redis.entries.has(key)).toBe(false);
+    } finally {
+      jest.restoreAllMocks();
+    }
+
+    await pool.query(
+      'UPDATE ticket_holds SET expires_at = clock_timestamp() - interval \'1 millisecond\' WHERE id = $1',
+      [hold.holdId]
+    );
+    await expect(expireDueHolds(pool)).resolves.toContain(hold.holdId);
+    expect(await inventory()).toMatchObject({ sold: 0, reserved: 0 });
+    expect((await pool.query(
+      'SELECT status FROM ticket_holds WHERE id = $1',
+      [hold.holdId]
+    )).rows[0].status).toBe('EXPIRED');
+  });
+
   test('rejects invalid requests, missing authentication, and unavailable inventory', async () => {
     const invalid = await request(app)
       .post('/api/bookings/hold')

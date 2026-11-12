@@ -16,7 +16,7 @@ It targets five failure points in existing event tooling:
 - **Gate congestion** — manual list checks and slow round-trips create entry queues.
 - **No live visibility** — organizers can't see entry throughput or tier performance in real time.
 
-The system addresses these with Redis-backed TTL inventory locks over PostgreSQL ACID transactions, HMAC-SHA256 signed dynamic QR passes, an automated FIFO waitlist with a 15-minute claim window, and a real-time organizer dashboard.
+The system addresses these with PostgreSQL-enforced inventory reservations mirrored to Redis with TTLs, HMAC-SHA256 signed dynamic QR passes, an automated FIFO waitlist with a 15-minute claim window, and a real-time organizer dashboard.
 
 ## Team
 
@@ -47,6 +47,30 @@ The system addresses these with Redis-backed TTL inventory locks over PostgreSQL
 8. **Automated waitlist** — PostgreSQL FIFO queue, durable in-app claim notifications, and 15-minute claims that reassign expired or declined inventory.
 9. **Telemetry & reports** — live scan velocity, attendance percentages, CSV/PDF exports.
 10. **Admin moderation** — event approval, account governance, audit log review.
+
+### Ticket hold lifecycle
+
+PostgreSQL is the source of truth for inventory and confirmed bookings. Creating a
+hold locks the ticket tier in a transaction, validates `sold + reserved` against
+the quota, increments `reserved`, and writes an active `ticket_holds` record with
+an expiry exactly 10 minutes after its creation. Redis mirrors that record under
+`passpulse:ticket-hold:<hold-id>` with an absolute expiry at the same deadline;
+Redis expiration removes the temporary key automatically, but does not itself
+change PostgreSQL inventory.
+
+Confirmation locks the owned hold and ticket tier, verifies that the hold is
+still active and unexpired, then atomically creates the booking and tickets,
+converts `reserved` to `sold`, and marks the hold confirmed. Redis cleanup happens
+after commit, while the expiry worker releases due PostgreSQL reservations and
+reconciles Redis keys to the durable hold state. Redis publication failures on
+ordinary holds are compensated in PostgreSQL; keys for persisted waitlist holds
+are repaired by reconciliation.
+
+When inventory can be allocated to a waitlist, entries are considered in FIFO
+queue order and receive a 15-minute claim. Accepting a claim creates the same
+10-minute booking hold used by ordinary bookings, and confirmation goes through
+the shared booking service. Expired or declined claims release their reservations
+and trigger allocation for the next eligible entry.
 
 ## Repository Structure
 
