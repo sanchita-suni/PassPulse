@@ -11,7 +11,7 @@ const app = require('../app');
 const db = require('../config/db');
 const { createToken } = require('../middleware/auth.middleware');
 const { setRedisClient } = require('../config/redis');
-const { HOLD_KEY_PREFIX } = require('./booking-hold.service');
+const { HOLD_KEY_PREFIX, createHold } = require('./booking-hold.service');
 const { runExpiryCycle } = require('./hold-expiry.worker');
 
 const describePostgres = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -158,6 +158,48 @@ describePostgres('FR-015/FR-016 PostgreSQL FIFO waitlist and claims', () => {
     expect(invalid.status).toBe(400);
   });
 
+  test('rejects waitlist joins while inventory is available, including concurrent callers', async () => {
+    await pool.query('UPDATE ticket_tiers SET quota = 2, sold = 1 WHERE id = $1', [tierId]);
+
+    const responses = await Promise.all([join(0), join(1), join(2)]);
+    expect(responses.map((response) => response.status)).toEqual([409, 409, 409]);
+    expect(responses.map((response) => response.body.code))
+      .toEqual(['WAITLIST_NOT_REQUIRED', 'WAITLIST_NOT_REQUIRED', 'WAITLIST_NOT_REQUIRED']);
+    expect((await pool.query(
+      'SELECT count(*)::int AS count FROM waitlist_entries WHERE tier_id = $1',
+      [tierId]
+    )).rows[0].count).toBe(0);
+
+    const [joinResponse, booking] = await Promise.all([
+      join(0),
+      createHold({
+        userId: attendees[1].id,
+        eventId,
+        tierId,
+        quantity: 1,
+      }),
+    ]);
+    expect(booking.status).toBe('ACTIVE');
+    const inventory = (await pool.query(
+      `SELECT quota, sold, reserved FROM ticket_tiers WHERE id = $1`,
+      [tierId]
+    )).rows[0];
+    expect(Number(inventory.sold) + Number(inventory.reserved)).toBeLessThanOrEqual(Number(inventory.quota));
+    const entries = await pool.query(
+      `SELECT status FROM waitlist_entries WHERE tier_id = $1`,
+      [tierId]
+    );
+    if (joinResponse.status === 201) {
+      expect(inventory).toMatchObject({ quota: 2, sold: 1, reserved: 1 });
+      expect(entries.rows).toEqual([{ status: 'WAITING' }]);
+    } else {
+      expect(joinResponse.status).toBe(409);
+      expect(joinResponse.body.code).toBe('WAITLIST_NOT_REQUIRED');
+      expect(entries.rowCount).toBe(0);
+      expect(inventory).toMatchObject({ quota: 2, sold: 1, reserved: 1 });
+    }
+  });
+
   test('allocates released inventory FIFO and expires a claim once before reallocating', async () => {
     const first = await join(0);
     const second = await join(1);
@@ -208,10 +250,16 @@ describePostgres('FR-015/FR-016 PostgreSQL FIFO waitlist and claims', () => {
   });
 
   test('accepts a claim once, exposes its notification, and confirms through the ticket flow', async () => {
-    await pool.query('UPDATE ticket_tiers SET sold = 0 WHERE id = $1', [tierId]);
     const joined = await join(0);
-    expect(joined.body.waitlist.entry.status).toBe('CLAIMED');
-    const claimId = joined.body.waitlist.claims[0].id;
+    await pool.query('UPDATE ticket_tiers SET sold = 0 WHERE id = $1', [tierId]);
+    await runExpiryCycle({ pool, redis: async () => redis });
+    expect(joined.body.waitlist.entry.status).toBe('WAITING');
+    const allocatedClaim = await pool.query(
+      `SELECT id FROM waitlist_claims WHERE waitlist_entry_id = $1 AND status = 'ACTIVE'`,
+      [joined.body.waitlist.entry.id]
+    );
+    expect(allocatedClaim.rowCount).toBe(1);
+    const claimId = allocatedClaim.rows[0].id;
 
     const notificationResponse = await request(app)
       .get('/api/bookings/notifications')
@@ -265,10 +313,16 @@ describePostgres('FR-015/FR-016 PostgreSQL FIFO waitlist and claims', () => {
   });
 
   test('declining an active claim immediately reallocates its reserved inventory', async () => {
-    await pool.query('UPDATE ticket_tiers SET sold = 0 WHERE id = $1', [tierId]);
     const first = await join(0);
     await join(1);
-    const claimId = first.body.waitlist.claims[0].id;
+    await pool.query('UPDATE ticket_tiers SET sold = 0 WHERE id = $1', [tierId]);
+    await runExpiryCycle({ pool, redis: async () => redis });
+    const allocatedClaim = await pool.query(
+      `SELECT id FROM waitlist_claims WHERE waitlist_entry_id = $1 AND status = 'ACTIVE'`,
+      [first.body.waitlist.entry.id]
+    );
+    expect(allocatedClaim.rowCount).toBe(1);
+    const claimId = allocatedClaim.rows[0].id;
     const declined = await request(app)
       .post(`/api/bookings/claims/${claimId}/decline`)
       .set('Authorization', auth(attendees[0].id))
@@ -288,10 +342,16 @@ describePostgres('FR-015/FR-016 PostgreSQL FIFO waitlist and claims', () => {
   });
 
   test('recovers an expired waitlist booking hold and offers its inventory to the next attendee', async () => {
-    await pool.query('UPDATE ticket_tiers SET sold = 0 WHERE id = $1', [tierId]);
     const first = await join(0);
     const second = await join(1);
-    const claimId = first.body.waitlist.claims[0].id;
+    await pool.query('UPDATE ticket_tiers SET sold = 0 WHERE id = $1', [tierId]);
+    await runExpiryCycle({ pool, redis: async () => redis });
+    const allocatedClaim = await pool.query(
+      `SELECT id FROM waitlist_claims WHERE waitlist_entry_id = $1 AND status = 'ACTIVE'`,
+      [first.body.waitlist.entry.id]
+    );
+    expect(allocatedClaim.rowCount).toBe(1);
+    const claimId = allocatedClaim.rows[0].id;
     const accepted = await request(app)
       .post(`/api/bookings/claims/${claimId}/accept`)
       .set('Authorization', auth(attendees[0].id))

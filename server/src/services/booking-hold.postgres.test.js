@@ -219,6 +219,18 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     expect(rows[0]).toMatchObject({ user_id: userId, event_id: eventId, tier_id: tierId, quantity: 1, status: 'ACTIVE' });
   });
 
+  test('BR-001: accepts five tickets and rejects six in one transaction', async () => {
+    await pool.query('UPDATE ticket_tiers SET quota = 5 WHERE id = $1', [tierId]);
+
+    const accepted = await createHold({ userId, eventId, tierId, quantity: 5 });
+    expect(accepted.quantity).toBe(5);
+    expect(await inventory()).toMatchObject({ quota: 5, sold: 0, reserved: 5 });
+
+    await expect(createHold({ userId, eventId, tierId, quantity: 6 }))
+      .rejects.toMatchObject({ status: 400, code: 'ORDER_LIMIT_EXCEEDED' });
+    expect(await inventory()).toMatchObject({ quota: 5, sold: 0, reserved: 5 });
+  });
+
   test('expires the Redis projection at its deadline and releases the durable reservation', async () => {
     const hold = await createHold({ userId, eventId, tierId, quantity: 1 });
     const key = `${HOLD_KEY_PREFIX}${hold.holdId}`;
@@ -631,6 +643,11 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     );
     expect(holdRow.rows[0]).toMatchObject({ status: 'CONFIRMED', booking_id: booking.id });
     expect(await inventory()).toMatchObject({ quota: 1, sold: 1, reserved: 0 });
+    expect((await pool.query(
+      `SELECT count(*)::int AS count FROM audit_log
+       WHERE actor_id = $1 AND action = 'BOOKING_CONFIRMED' AND target = $2`,
+      [userId, booking.id]
+    )).rows[0].count).toBe(1);
     expect(getTicketById(booking.tickets[0].ticketId)).toBeDefined();
 
     const pass = await request(app)
@@ -738,6 +755,26 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     expect(await inventory()).toMatchObject({ quota: 2, sold: 2, reserved: 0 });
   });
 
+  test('confirms an existing reservation after the tier quota is lowered to the held quantity', async () => {
+    await pool.query('UPDATE ticket_tiers SET quota = 3 WHERE id = $1', [tierId]);
+    const hold = await createHold({ userId, eventId, tierId, quantity: 2 });
+    await pool.query('UPDATE ticket_tiers SET quota = 2 WHERE id = $1', [tierId]);
+
+    const response = await request(app)
+      .post('/api/bookings/confirm')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ holdId: hold.holdId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.booking.tickets).toHaveLength(2);
+    expect(await inventory()).toMatchObject({ quota: 2, sold: 2, reserved: 0 });
+    expect((await pool.query(
+      `SELECT count(*)::int AS count FROM audit_log
+       WHERE actor_id = $1 AND action = 'BOOKING_CONFIRMED' AND target = $2`,
+      [userId, response.body.booking.id]
+    )).rows[0].count).toBe(1);
+  });
+
   test('makes repeated confirmation and two concurrent confirmations idempotent', async () => {
     const hold = await createHold({ userId, eventId, tierId, quantity: 1 });
     const sendConfirmation = () => request(app)
@@ -757,6 +794,10 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     expect(retry.body.booking.id).toBe(first.body.booking.id);
     expect((await pool.query('SELECT count(*)::int AS count FROM bookings')).rows[0].count).toBe(1);
     expect((await pool.query('SELECT count(*)::int AS count FROM tickets')).rows[0].count).toBe(1);
+    expect((await pool.query(
+      `SELECT count(*)::int AS count FROM audit_log
+       WHERE action = 'BOOKING_CONFIRMED'`
+    )).rows[0].count).toBe(1);
     expect(await inventory()).toMatchObject({ sold: 1, reserved: 0 });
   });
 
@@ -781,6 +822,10 @@ describePostgres('FR-008/FR-009 PostgreSQL and Redis-backed ticket holds', () =>
     expect((await pool.query('SELECT status FROM ticket_holds WHERE id = $1', [hold.holdId])).rows[0].status).toBe('ACTIVE');
     expect((await pool.query('SELECT count(*)::int AS count FROM bookings')).rows[0].count).toBe(0);
     expect((await pool.query('SELECT count(*)::int AS count FROM tickets')).rows[0].count).toBe(0);
+    expect((await pool.query(
+      `SELECT count(*)::int AS count FROM audit_log
+       WHERE action = 'BOOKING_CONFIRMED'`
+    )).rows[0].count).toBe(0);
     expect(await inventory()).toMatchObject({ sold: 0, reserved: 1 });
   });
 
