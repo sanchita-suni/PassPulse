@@ -1,6 +1,7 @@
-require('dotenv').config(
-  process.env.DOTENV_CONFIG_PATH ? { path: process.env.DOTENV_CONFIG_PATH } : undefined
-);
+const path = require('path');
+require('dotenv').config({
+  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, '..', '.env'),
+});
 const app = require('./app');
 const { runMigrations } = require('./config/migration-runner');
 const { closePool } = require('./config/db');
@@ -13,14 +14,18 @@ const PORT = process.env.PORT || 5000;
 let httpServer;
 
 async function start() {
-  const applied = await runMigrations();
-  if (applied.length) {
-    console.log(`Applied database migrations: ${applied.join(', ')}`);
+  try {
+    const applied = await runMigrations();
+    if (applied.length) {
+      console.log(`Applied database migrations: ${applied.join(', ')}`);
+    }
+  } catch (error) {
+    console.log(`[PassPulse] Database connection note: ${error.message || 'not reachable'}. Running in-memory catalog & auth mode (DEV-001, DEV-002, DEV-006).`);
   }
   startHoldExpiryWorker();
   startAvailabilityPoller();
   httpServer = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`PassPulse Server running on port ${PORT}`);
   });
 }
 

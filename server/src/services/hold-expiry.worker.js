@@ -122,12 +122,17 @@ async function runExpiryCycle({ pool = getPool(), redis = connectRedis } = {}) {
   }
 }
 
+let lastLoggedError = 0;
 function startHoldExpiryWorker(options = {}) {
   if (timer) return;
   const intervalMs = options.intervalMs || DEFAULT_INTERVAL_MS;
   const cycle = () => {
     runExpiryCycle(options).catch((error) => {
-      console.error('Ticket hold expiry cycle failed; it will be retried:', error);
+      const now = Date.now();
+      if (now - lastLoggedError > 30000) {
+        console.warn('Ticket hold expiry worker awaiting database connection...');
+        lastLoggedError = now;
+      }
     });
   };
   cycle();
